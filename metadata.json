@@ -1,0 +1,6 @@
+{
+  "name": "Family Wallet",
+  "description": "Native Android informational vault to securely store Credit Cards, Debit Cards, Online Wallets, and Bank Accounts with 3D card flips and Google Wallet Material 3 aesthetic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
