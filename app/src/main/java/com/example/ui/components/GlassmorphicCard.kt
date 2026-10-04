@@ -15,19 +15,25 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+// Cohesive Doodle & Material 3 Card Shape Tokens
+val DoodleCardShape = RoundedCornerShape(20.dp)
+val DoodleSubCardShape = RoundedCornerShape(14.dp)
+val DoodleChipShape = RoundedCornerShape(10.dp)
+val DoodleDialogShape = RoundedCornerShape(24.dp)
+
 /**
- * Pure Material 3 Card Container inspired by Google Wallet design language.
- * Uses clean tonal surfaces, subtle borders, and generous rounded corners.
+ * Pure Material 3 & Doodle Aesthetic Card Container.
+ * Standardizes consistent 20.dp corner radius, 1.5.dp outline stroke, and 2.dp tactile elevation.
  */
 @Composable
 fun MaterialCardContainer(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape = DoodleCardShape,
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     tonalElevation: Dp = 2.dp,
-    shadowElevation: Dp = 1.dp,
-    border: BorderStroke? = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    shadowElevation: Dp = 2.dp,
+    border: BorderStroke? = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
@@ -54,10 +60,10 @@ fun MaterialCardContainer(
 @Composable
 fun GlassmorphicContainer(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape = DoodleCardShape,
     backgroundColor: Color = MaterialTheme.colorScheme.surface,
     borderColor: Color = MaterialTheme.colorScheme.outlineVariant,
-    borderWidth: Dp = 1.dp,
+    borderWidth: Dp = 1.5.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {

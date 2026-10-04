@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,41 +22,53 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.VerifiedUser
+import androidx.compose.material.icons.outlined.QrCode
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -63,81 +76,153 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.KycStatus
-import com.example.data.OnlineWallet
+import com.example.data.DisplayMode
+import com.example.data.WalletOrGiftCard
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.EmeraldMint
 import com.example.ui.theme.IndigoAccent
 import com.example.ui.viewmodel.FamilyWalletUiState
-import com.example.util.CurrencyFormatter
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletsScreen(
     uiState: FamilyWalletUiState,
     onOpenAddWallet: () -> Unit,
-    onDeleteWallet: (String) -> Unit,
+    onOpenEditWalletOrGiftCard: (WalletOrGiftCard) -> Unit,
+    onDeleteWalletOrGiftCard: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var selectedWalletToDelete by remember { mutableStateOf<OnlineWallet?>(null) }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val tabTitles = listOf("All", "Online Wallets", "Gift Cards")
+    var itemToDelete by remember { mutableStateOf<WalletOrGiftCard?>(null) }
 
-    var isLoaded by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(50)
-        isLoaded = true
+    // Immediate zero-latency rendering
+    val isLoaded = true
+
+    val displayedItems by remember(uiState.filteredWalletsAndGiftCards, selectedTabIndex) {
+        derivedStateOf {
+            when (selectedTabIndex) {
+                1 -> uiState.filteredWalletsAndGiftCards.filter { !it.isGiftCard }
+                2 -> uiState.filteredWalletsAndGiftCards.filter { it.isGiftCard }
+                else -> uiState.filteredWalletsAndGiftCards
+            }
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        if (uiState.filteredOnlineWallets.isEmpty()) {
-            EmptyWalletsView(onAddWallet = onOpenAddWallet)
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag("wallets_screen"),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Tabs: All, Online Wallets, Gift Cards
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 1.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                item {
-                    Column {
-                        Text(
-                            text = "DIGITAL & UPI WALLETS (${uiState.filteredOnlineWallets.size})",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 1.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Paytm, PhonePe, Google Pay, Amazon Pay & CRED Vault",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                items(uiState.filteredOnlineWallets, key = { it.id }) { wallet ->
-                    AnimatedVisibility(
-                        visible = isLoaded,
-                        enter = slideInVertically(initialOffsetY = { 40 }) + fadeIn()
-                    ) {
-                        val member = uiState.members.find { it.id == wallet.memberId }
-
-                        WalletCardItem(
-                            wallet = wallet,
-                            memberName = member?.name,
-                            onDelete = { selectedWalletToDelete = wallet },
-                            onCopy = { label, text ->
-                                copyToClipboard(context, label, text)
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    tabTitles.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTabIndex == index,
+                            onClick = { selectedTabIndex = index },
+                            text = {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    maxLines = 1
+                                )
                             }
                         )
                     }
                 }
             }
+
+            if (displayedItems.isEmpty()) {
+                EmptyWalletsAndGiftCardsView(onAddItem = onOpenAddWallet)
+            } else {
+                when (uiState.displayMode) {
+                    DisplayMode.CAROUSEL -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("wallets_screen"),
+                            contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            item {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    contentPadding = PaddingValues(horizontal = 16.dp)
+                                ) {
+                                    items(displayedItems, key = { it.id }) { item ->
+                                        val member = uiState.members.find { it.id == item.memberId }
+                                        Box(modifier = Modifier.width(320.dp)) {
+                                            WalletOrGiftCardItem(
+                                                item = item,
+                                                memberName = member?.name,
+                                                onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                                onDelete = { itemToDelete = item },
+                                                onCopyText = { label, value -> copyToClipboard(context, label, value) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    DisplayMode.GRID -> {
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 300.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("wallets_screen"),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(displayedItems, key = { it.id }) { item ->
+                                val member = uiState.members.find { it.id == item.memberId }
+                                WalletOrGiftCardItem(
+                                    item = item,
+                                    memberName = member?.name,
+                                    onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                    onDelete = { itemToDelete = item },
+                                    onCopyText = { label, value -> copyToClipboard(context, label, value) }
+                                )
+                            }
+                        }
+                    }
+
+                    DisplayMode.LIST -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("wallets_screen"),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(displayedItems, key = { it.id }) { item ->
+                                AnimatedVisibility(visible = isLoaded, enter = slideInVertically(initialOffsetY = { 30 }) + fadeIn()) {
+                                    val member = uiState.members.find { it.id == item.memberId }
+                                    WalletOrGiftCardItem(
+                                        item = item,
+                                        memberName = member?.name,
+                                        onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                        onDelete = { itemToDelete = item },
+                                        onCopyText = { label, value -> copyToClipboard(context, label, value) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // Floating Action Button
+        // FAB to Add Wallet or Gift Card
         FloatingActionButton(
             onClick = onOpenAddWallet,
             modifier = Modifier
@@ -152,33 +237,32 @@ fun WalletsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Online Wallet")
-                Text("Add Wallet", fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.Add, contentDescription = "Add Item")
+                Text("Add Wallet / Gift", fontWeight = FontWeight.Bold)
             }
         }
     }
 
-    // Delete Confirmation
-    if (selectedWalletToDelete != null) {
-        val wal = selectedWalletToDelete!!
+    // Delete Confirmation Dialog
+    itemToDelete?.let { item ->
+        val label = if (item.isGiftCard) "Gift Card" else "Wallet"
         AlertDialog(
-            onDismissRequest = { selectedWalletToDelete = null },
-            title = { Text("Remove Wallet?") },
-            text = { Text("Remove '${wal.providerName}' from the vault?") },
+            onDismissRequest = { itemToDelete = null },
+            title = { Text("Delete $label?") },
+            text = { Text("Are you sure you want to remove ${item.providerOrName} from your vault?") },
             confirmButton = {
                 Button(
                     onClick = {
-                        onDeleteWallet(wal.id)
-                        selectedWalletToDelete = null
-                        Toast.makeText(context, "Wallet removed", Toast.LENGTH_SHORT).show()
+                        onDeleteWalletOrGiftCard(item.id)
+                        itemToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Remove")
+                    Text("Delete")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { selectedWalletToDelete = null }) {
+                TextButton(onClick = { itemToDelete = null }) {
                     Text("Cancel")
                 }
             }
@@ -186,101 +270,111 @@ fun WalletsScreen(
     }
 }
 
+/**
+ * Solid Block Card for Wallet / Gift Card (Google Wallet Style, ExtraLarge 24-28dp corners)
+ */
 @Composable
-private fun WalletCardItem(
-    wallet: OnlineWallet,
+private fun WalletOrGiftCardItem(
+    item: WalletOrGiftCard,
     memberName: String?,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onCopy: (String, String) -> Unit
+    onCopyText: (String, String) -> Unit
 ) {
-    val providerColor = when {
-        wallet.providerName.contains("Paytm", ignoreCase = true) -> Color(0xFF002E6E)
-        wallet.providerName.contains("PhonePe", ignoreCase = true) -> Color(0xFF5F259F)
-        wallet.providerName.contains("Google", ignoreCase = true) -> Color(0xFF1A73E8)
-        wallet.providerName.contains("Amazon", ignoreCase = true) -> Color(0xFFFF9900)
-        wallet.providerName.contains("CRED", ignoreCase = true) -> Color(0xFF18181B)
-        else -> IndigoAccent
-    }
+    val accentColor = Color(item.colorHex)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-        ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("wallet_gift_card_${item.id}"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.5.dp, accentColor.copy(alpha = 0.65f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = 0.15f),
+                            accentColor.copy(alpha = 0.04f),
+                            MaterialTheme.colorScheme.surface
+                        )
+                    )
+                )
         ) {
-            // Header: Provider Icon + Title + KYC Badge + Delete
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Header Row: Icon, Provider/Brand Name, Type Badge, Edit/Delete
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(providerColor),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = wallet.providerName.take(2).uppercase(),
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                            color = Color.White
-                        )
-                    }
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(accentColor)
+                                .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (item.isGiftCard) Icons.Outlined.CardGiftcard else Icons.Outlined.AccountBalanceWallet,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
 
-                    Column {
-                        Text(
-                            text = wallet.providerName,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            KycStatusBadge(status = wallet.kycStatus)
-                            if (memberName != null) {
+                        Column {
+                            Text(
+                                text = item.providerOrName,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = accentColor.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
+                            ) {
                                 Text(
-                                    text = "• $memberName",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = if (item.isGiftCard) "Gift Card • ${if (item.amount > 0) "₹${item.amount.toInt()}" else "Voucher"}" else "Online Wallet • ${item.kycStatus}",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = accentColor
                                 )
                             }
                         }
                     }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        }
+                    }
                 }
 
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
+                // Identifier / Code Row
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = accentColor.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Wallet",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            // Primary UPI ID Bar
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onCopy("UPI ID", wallet.upiId) },
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -288,157 +382,148 @@ private fun WalletCardItem(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.QrCode, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                        Column {
-                            Text(
-                                text = "PRIMARY UPI ID",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 0.5.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = wallet.upiId,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                    Column {
+                        Text(
+                            text = if (item.isGiftCard) "CARD NUMBER / VOUCHER PIN" else "VPA / UPI ID / PHONE",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = item.cardNumberOrUpi,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { onCopyText(if (item.isGiftCard) "Voucher Code" else "UPI ID", item.cardNumberOrUpi) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.ContentCopy,
+                            contentDescription = "Copy",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            // Additional details: Expiry, Mode of Redemption, Remarks
+            if (item.isGiftCard) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (item.expiryDate.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Text("EXPIRES", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(item.expiryDate, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
+                            }
                         }
                     }
 
-                    Icon(
-                        imageVector = Icons.Outlined.ContentCopy,
-                        contentDescription = "Copy UPI ID",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text("REDEMPTION", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(item.modeOfRedemption, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+
+                if (item.remarks.isNotBlank()) {
+                    Text(
+                        text = "Note: ${item.remarks}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                if (item.registeredMobile.isNotBlank()) {
+                    Text(
+                        text = "Linked Mobile: ${item.registeredMobile}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Registered Phone & Email
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (wallet.registeredMobile.isNotBlank()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onCopy("Registered Mobile", wallet.registeredMobile) },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Phone, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                            Text(
-                                text = "Linked Mobile: ${wallet.registeredMobile}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Mobile", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    }
+            // Member Badge Footer
+            if (!memberName.isNullOrBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(accentColor.copy(alpha = 0.1f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = accentColor, modifier = Modifier.size(14.dp))
+                    Text(memberName, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = accentColor)
                 }
-
-                if (wallet.registeredEmail.isNotBlank()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onCopy("Registered Email", wallet.registeredEmail) },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                            Text(
-                                text = wallet.registeredEmail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Email", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    }
-                }
-
-                Text(
-                    text = "Wallet Limit: ${CurrencyFormatter.formatRupees(wallet.walletLimit, false)}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
     }
 }
-
-@Composable
-private fun KycStatusBadge(status: KycStatus) {
-    val (color, text) = when (status) {
-        KycStatus.FULL_KYC -> Pair(EmeraldMint, "Full KYC Verified")
-        KycStatus.MIN_KYC -> Pair(AmberGold, "Min KYC")
-        KycStatus.PENDING -> Pair(Color(0xFFEF4444), "KYC Pending")
-    }
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.15f))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(color))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                color = color,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
 }
 
 @Composable
-private fun EmptyWalletsView(onAddWallet: () -> Unit) {
-    Column(
+private fun EmptyWalletsAndGiftCardsView(onAddItem: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .fillMaxWidth()
+            .padding(16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.AccountBalanceWallet,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp)
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CardGiftcard,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            Text(
+                text = "No Wallets or Gift Cards in Vault",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
             )
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Keep your Amazon, Apple, Flipkart gift cards, voucher codes, and Paytm/PhonePe/GPay wallets organized in one unified vault.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
 
-        Text(
-            text = "No Online Wallets Linked",
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = "Vault your Paytm, PhonePe, Google Pay, Amazon Pay & CRED wallets with UPI identifiers and KYC records.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(onClick = onAddWallet) {
-            Text("+ Add Online Wallet")
+            Button(onClick = onAddItem, shape = RoundedCornerShape(12.dp)) {
+                Text("+ Add Wallet / Gift Card")
+            }
         }
     }
 }

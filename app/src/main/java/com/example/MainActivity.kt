@@ -9,8 +9,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -25,9 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,17 +48,20 @@ import com.example.ui.viewmodel.FamilyWalletViewModel
 
 class MainActivity : FragmentActivity() {
 
+    private var walletViewModel: FamilyWalletViewModel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
-            val walletViewModel: FamilyWalletViewModel = viewModel()
-            val state by walletViewModel.uiState.collectAsStateWithLifecycle()
+            val vm: FamilyWalletViewModel = viewModel()
+            walletViewModel = vm
+            val state by vm.uiState.collectAsStateWithLifecycle()
 
             FamilyWalletTheme(themeMode = state.themeMode) {
                 FamilyWalletApp(
-                    viewModel = walletViewModel,
+                    viewModel = vm,
                     onRequestBiometrics = {
                         val canAuth = BiometricAuthManager.checkAvailability(this)
                         if (canAuth.canPrompt) {
@@ -71,7 +70,7 @@ class MainActivity : FragmentActivity() {
                                 title = "Family Financial Vault",
                                 subtitle = "Authenticate to unlock vault",
                                 onSuccess = {
-                                    walletViewModel.unlockApp()
+                                    vm.unlockApp()
                                 },
                                 onError = { errorCode: Int, errString: CharSequence ->
                                     Toast.makeText(this, "Biometric error: $errString", Toast.LENGTH_SHORT).show()
@@ -81,11 +80,50 @@ class MainActivity : FragmentActivity() {
                                 }
                             )
                         } else {
-                            walletViewModel.unlockApp()
+                            vm.unlockApp()
                         }
                     },
                     biometricAvailability = BiometricAuthManager.checkAvailability(this)
                 )
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Lock the vault whenever app is closed, minimized or switched away
+        walletViewModel?.let { vm ->
+            if (vm.uiState.value.biometricEnabled) {
+                vm.lockApp()
+            }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Ensure vault is locked when app is stopped
+        walletViewModel?.let { vm ->
+            if (vm.uiState.value.biometricEnabled) {
+                vm.lockApp()
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        walletViewModel?.let { vm ->
+            if (vm.uiState.value.biometricEnabled && vm.uiState.value.isAppLocked) {
+                val canAuth = BiometricAuthManager.checkAvailability(this)
+                if (canAuth.canPrompt) {
+                    BiometricAuthManager.promptBiometricAuthentication(
+                        activity = this,
+                        title = "Family Financial Vault",
+                        subtitle = "Authenticate to unlock vault",
+                        onSuccess = { vm.unlockApp() },
+                        onError = { _, _ -> },
+                        onFailed = {}
+                    )
+                }
             }
         }
     }
@@ -139,7 +177,7 @@ fun FamilyWalletApp(
                     onLockApp = { viewModel.lockApp() },
                     onSearchQueryChange = { query -> viewModel.setSearchQuery(query) },
                     onSetDisplayMode = { mode -> viewModel.setDisplayMode(mode) },
-                    onSetNetworkFilter = { net -> viewModel.setNetworkFilter(net) }
+                    onSetThemeMode = { mode -> viewModel.setThemeMode(mode) }
                 )
             },
             bottomBar = {
@@ -173,14 +211,15 @@ fun FamilyWalletApp(
                             onOpenAddDebitCard = { viewModel.setAddDebitCardDialogVisible(true) },
                             onOpenAddAccount = { viewModel.setAddAccountDialogVisible(true) },
                             onOpenAddWallet = { viewModel.setAddWalletDialogVisible(true) },
-                            onToggleCardFlip = { cardId -> viewModel.toggleCardFlip(cardId) },
-                            onToggleItemMask = { itemId -> viewModel.toggleItemMask(itemId) }
+                            onOpenAddMember = { viewModel.setAddMemberDialogVisible(true) }
                         )
 
                         NavigationTab.CARDS -> CardsScreen(
                             uiState = state,
                             onOpenAddCreditCard = { viewModel.setAddCreditCardDialogVisible(true) },
                             onOpenAddDebitCard = { viewModel.setAddDebitCardDialogVisible(true) },
+                            onOpenEditCreditCard = { card -> viewModel.openEditCreditCard(card) },
+                            onOpenEditDebitCard = { card -> viewModel.openEditDebitCard(card) },
                             onToggleCardFlip = { cardId -> viewModel.toggleCardFlip(cardId) },
                             onToggleItemMask = { itemId -> viewModel.toggleItemMask(itemId) },
                             onDeleteCreditCard = { id -> viewModel.deleteCreditCard(id) },
@@ -190,6 +229,7 @@ fun FamilyWalletApp(
                         NavigationTab.ACCOUNTS -> AccountsScreen(
                             uiState = state,
                             onOpenAddAccount = { viewModel.setAddAccountDialogVisible(true) },
+                            onOpenEditAccount = { account -> viewModel.openEditBankAccount(account) },
                             onDeleteAccount = { id -> viewModel.deleteBankAccount(id) },
                             onToggleMask = { id -> viewModel.toggleItemMask(id) }
                         )
@@ -197,13 +237,16 @@ fun FamilyWalletApp(
                         NavigationTab.WALLETS -> WalletsScreen(
                             uiState = state,
                             onOpenAddWallet = { viewModel.setAddWalletDialogVisible(true) },
-                            onDeleteWallet = { id -> viewModel.deleteOnlineWallet(id) }
+                            onOpenEditWalletOrGiftCard = { item -> viewModel.openEditWalletOrGiftCard(item) },
+                            onDeleteWalletOrGiftCard = { id -> viewModel.deleteWalletOrGiftCard(id) }
                         )
 
                         NavigationTab.MEMBERS -> FamilyMembersScreen(
                             uiState = state,
                             onSelectMember = { memberId -> viewModel.setSelectedMember(memberId) },
-                            onOpenAddMember = { viewModel.setAddMemberDialogVisible(true) }
+                            onOpenAddMember = { viewModel.setAddMemberDialogVisible(true) },
+                            onOpenEditMember = { member -> viewModel.openEditMember(member) },
+                            onDeleteMember = { memberId -> viewModel.deleteFamilyMember(memberId) }
                         )
 
                         NavigationTab.SETTINGS -> SettingsScreen(
@@ -211,7 +254,8 @@ fun FamilyWalletApp(
                             onSetThemeMode = { mode -> viewModel.setThemeMode(mode) },
                             onToggleBiometric = { viewModel.toggleBiometricEnabled() },
                             onLockApp = { viewModel.lockApp() },
-                            onSyncGoogleDrive = { viewModel.syncWithGoogleDrive() }
+                            onSyncGoogleDrive = { viewModel.syncWithGoogleDrive() },
+                            onRestoreGoogleDrive = { viewModel.restoreFromGoogleDrive() }
                         )
                     }
                 }
@@ -219,50 +263,45 @@ fun FamilyWalletApp(
         }
     }
 
-    // Modal Dialogs
+    // Modal Dialogs for Complete CRUD Operations
     if (state.showAddCreditCardDialog || state.showAddDebitCardDialog) {
         AddCardDialog(
             members = state.members,
+            creditCardToEdit = state.editingCreditCard,
+            debitCardToEdit = state.editingDebitCard,
             initialIsCredit = state.showAddCreditCardDialog,
             onDismiss = {
                 viewModel.setAddCreditCardDialogVisible(false)
                 viewModel.setAddDebitCardDialogVisible(false)
             },
-            onAddCreditCard = { bank, card, net, num, exp, cvv, holder, stmt, due, limit, fee, waiver, mem, theme ->
-                viewModel.addCreditCard(bank, card, net, num, exp, cvv, holder, stmt, due, limit, fee, waiver, mem, theme)
-            },
-            onAddDebitCard = { bank, acc, net, num, exp, cvv, holder, atm, pos, mem, theme ->
-                viewModel.addDebitCard(bank, acc, net, num, exp, cvv, holder, atm, pos, mem, theme)
-            }
+            onSaveCreditCard = { card -> viewModel.saveCreditCard(card) },
+            onSaveDebitCard = { card -> viewModel.saveDebitCard(card) }
         )
     }
 
     if (state.showAddAccountDialog) {
         AddAccountDialog(
             members = state.members,
+            accountToEdit = state.editingBankAccount,
             onDismiss = { viewModel.setAddAccountDialogVisible(false) },
-            onAddAccount = { bank, type, num, ifsc, branch, holder, custId, mob, upi, minBal, mem ->
-                viewModel.addBankAccount(bank, type, num, ifsc, branch, holder, custId, mob, upi, minBal, mem)
-            }
+            onSaveAccount = { account -> viewModel.saveBankAccount(account) }
         )
     }
 
     if (state.showAddWalletDialog) {
         AddWalletDialog(
             members = state.members,
+            itemToEdit = state.editingWalletOrGiftCard,
             onDismiss = { viewModel.setAddWalletDialogVisible(false) },
-            onAddWallet = { provider, mob, email, upi, kyc, limit, mem ->
-                viewModel.addOnlineWallet(provider, mob, email, upi, kyc, limit, mem)
-            }
+            onSaveItem = { item -> viewModel.saveWalletOrGiftCard(item) }
         )
     }
 
     if (state.showAddMemberDialog) {
         AddMemberDialog(
+            memberToEdit = state.editingMember,
             onDismiss = { viewModel.setAddMemberDialogVisible(false) },
-            onAddMember = { name, rel, emoji, color ->
-                viewModel.addFamilyMember(name, rel, emoji, color)
-            }
+            onConfirm = { member -> viewModel.saveFamilyMember(member) }
         )
     }
 }

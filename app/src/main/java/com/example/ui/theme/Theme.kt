@@ -1,6 +1,8 @@
 package com.example.ui.theme
 
 import android.os.Build
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -8,6 +10,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.data.AppThemeMode
@@ -33,25 +36,26 @@ private val DarkColorScheme = darkColorScheme(
     outlineVariant = Color(0x1A94A3B8)
 )
 
+// Strict High-Contrast Light Theme: Crisp White Background + Stark Black Text + Colorful Vivid Icons
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF4F46E5),
+    primary = Color(0xFF1A73E8), // Vibrant Google Blue
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE0E7FF),
-    onPrimaryContainer = Color(0xFF1E1B4B),
-    secondary = Color(0xFF0284C7),
+    primaryContainer = Color(0xFFE8F0FE),
+    onPrimaryContainer = Color(0xFF174EA6),
+    secondary = Color(0xFF059669), // Vivid Emerald Green
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE0F2FE),
-    onSecondaryContainer = Color(0xFF082F49),
-    tertiary = Color(0xFF059669),
+    secondaryContainer = Color(0xFFD1FAE5),
+    onSecondaryContainer = Color(0xFF064E3B),
+    tertiary = Color(0xFFD97706), // Vivid Amber
     onTertiary = Color.White,
-    background = LightBackgroundStart,
-    onBackground = TextPrimaryLight,
-    surface = LightSurfaceElevated,
-    onSurface = TextPrimaryLight,
-    surfaceVariant = Color(0xFFF1F5F9),
-    onSurfaceVariant = TextSecondaryLight,
-    outline = LightGlassBorder,
-    outlineVariant = Color(0x1A0F172A)
+    background = Color(0xFFFFFFFF), // Crisp 100% White
+    onBackground = Color(0xFF000000), // Stark 100% Black
+    surface = Color(0xFFFFFFFF), // Crisp 100% White
+    onSurface = Color(0xFF000000), // Stark 100% Black
+    surfaceVariant = Color(0xFFF3F4F6),
+    onSurfaceVariant = Color(0xFF111827),
+    outline = Color(0xFFD1D5DB),
+    outlineVariant = Color(0xFFE5E7EB)
 )
 
 private val PitchBlackColorScheme = darkColorScheme(
@@ -75,6 +79,48 @@ private val PitchBlackColorScheme = darkColorScheme(
     outlineVariant = Color(0xFF1F1F1F)
 )
 
+private val DoodleColorScheme = lightColorScheme(
+    primary = DoodlePrimary,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE3E3),
+    onPrimaryContainer = Color(0xFF6E1A24),
+    secondary = DoodleSecondary,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFDCEBFF),
+    onSecondaryContainer = Color(0xFF0F3970),
+    tertiary = DoodleTertiary,
+    onTertiary = Color.White,
+    background = DoodleBackground,
+    onBackground = DoodleInk,
+    surface = DoodleSurface,
+    onSurface = DoodleInk,
+    surfaceVariant = DoodleSurfaceElevated,
+    onSurfaceVariant = DoodleInkSecondary,
+    outline = DoodleBorder,
+    outlineVariant = Color(0x3322223B)
+)
+
+private val DoodleDarkColorScheme = darkColorScheme(
+    primary = DoodleDarkPrimary,
+    onPrimary = Color(0xFF2B0A11),
+    primaryContainer = DoodleDarkPrimaryContainer,
+    onPrimaryContainer = Color(0xFFFFD9DF),
+    secondary = DoodleDarkSecondary,
+    onSecondary = Color(0xFF042033),
+    secondaryContainer = DoodleDarkSecondaryContainer,
+    onSecondaryContainer = Color(0xFFBAE6FD),
+    tertiary = DoodleDarkTertiary,
+    onTertiary = Color(0xFF052B14),
+    background = DoodleDarkBackground,
+    onBackground = DoodleDarkInk,
+    surface = DoodleDarkSurface,
+    onSurface = DoodleDarkInk,
+    surfaceVariant = DoodleDarkSurfaceElevated,
+    onSurfaceVariant = DoodleDarkInkSecondary,
+    outline = DoodleDarkBorder,
+    outlineVariant = Color(0x4464748B)
+)
+
 private val PaperlikeColorScheme = lightColorScheme(
     primary = PaperlikeAccent,
     onPrimary = Color.White,
@@ -96,24 +142,79 @@ private val PaperlikeColorScheme = lightColorScheme(
     outlineVariant = Color(0x33B45309)
 )
 
+private val HighContrastColorScheme = darkColorScheme(
+    primary = HighContrastPrimary,
+    onPrimary = Color.Black,
+    primaryContainer = Color(0xFF262600),
+    onPrimaryContainer = HighContrastPrimary,
+    secondary = HighContrastSecondary,
+    onSecondary = Color.Black,
+    secondaryContainer = Color(0xFF002E2E),
+    onSecondaryContainer = HighContrastSecondary,
+    tertiary = HighContrastTertiary,
+    onTertiary = Color.Black,
+    background = HighContrastBackground,
+    onBackground = HighContrastTextPrimary,
+    surface = HighContrastSurface,
+    onSurface = HighContrastTextPrimary,
+    surfaceVariant = HighContrastSurfaceElevated,
+    onSurfaceVariant = HighContrastTextSecondary,
+    outline = HighContrastBorder,
+    outlineVariant = Color(0xFFB3B3B3)
+)
+
 @Composable
 fun FamilyWalletTheme(
     themeMode: AppThemeMode = AppThemeMode.DARK,
-    darkTheme: Boolean = true, // for backwards-compatibility
+    darkTheme: Boolean = true,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val systemInDark = isSystemInDarkTheme()
-    val colorScheme = when (themeMode) {
+    val targetColorScheme = when (themeMode) {
+        AppThemeMode.DOODLE -> DoodleColorScheme
+        AppThemeMode.DOODLE_DARK -> DoodleDarkColorScheme
         AppThemeMode.LIGHT -> LightColorScheme
         AppThemeMode.DARK -> DarkColorScheme
         AppThemeMode.PITCH_BLACK -> PitchBlackColorScheme
+        AppThemeMode.HIGH_CONTRAST -> HighContrastColorScheme
         AppThemeMode.PAPERLIKE -> PaperlikeColorScheme
-        AppThemeMode.SYSTEM -> if (systemInDark) DarkColorScheme else LightColorScheme
+        AppThemeMode.SYSTEM -> if (systemInDark) DoodleDarkColorScheme else DoodleColorScheme
     }
 
+    // Smooth color transitions when theme is switched
+    val animatedPrimary by animateColorAsState(targetValue = targetColorScheme.primary, animationSpec = tween(300), label = "primary")
+    val animatedOnPrimary by animateColorAsState(targetValue = targetColorScheme.onPrimary, animationSpec = tween(300), label = "onPrimary")
+    val animatedPrimaryContainer by animateColorAsState(targetValue = targetColorScheme.primaryContainer, animationSpec = tween(300), label = "primaryContainer")
+    val animatedOnPrimaryContainer by animateColorAsState(targetValue = targetColorScheme.onPrimaryContainer, animationSpec = tween(300), label = "onPrimaryContainer")
+    val animatedSecondary by animateColorAsState(targetValue = targetColorScheme.secondary, animationSpec = tween(300), label = "secondary")
+    val animatedBackground by animateColorAsState(targetValue = targetColorScheme.background, animationSpec = tween(300), label = "background")
+    val animatedOnBackground by animateColorAsState(targetValue = targetColorScheme.onBackground, animationSpec = tween(300), label = "onBackground")
+    val animatedSurface by animateColorAsState(targetValue = targetColorScheme.surface, animationSpec = tween(300), label = "surface")
+    val animatedOnSurface by animateColorAsState(targetValue = targetColorScheme.onSurface, animationSpec = tween(300), label = "onSurface")
+    val animatedSurfaceVariant by animateColorAsState(targetValue = targetColorScheme.surfaceVariant, animationSpec = tween(300), label = "surfaceVariant")
+    val animatedOnSurfaceVariant by animateColorAsState(targetValue = targetColorScheme.onSurfaceVariant, animationSpec = tween(300), label = "onSurfaceVariant")
+    val animatedOutline by animateColorAsState(targetValue = targetColorScheme.outline, animationSpec = tween(300), label = "outline")
+    val animatedOutlineVariant by animateColorAsState(targetValue = targetColorScheme.outlineVariant, animationSpec = tween(300), label = "outlineVariant")
+
+    val animatedColorScheme = targetColorScheme.copy(
+        primary = animatedPrimary,
+        onPrimary = animatedOnPrimary,
+        primaryContainer = animatedPrimaryContainer,
+        onPrimaryContainer = animatedOnPrimaryContainer,
+        secondary = animatedSecondary,
+        background = animatedBackground,
+        onBackground = animatedOnBackground,
+        surface = animatedSurface,
+        onSurface = animatedOnSurface,
+        surfaceVariant = animatedSurfaceVariant,
+        onSurfaceVariant = animatedOnSurfaceVariant,
+        outline = animatedOutline,
+        outlineVariant = animatedOutlineVariant
+    )
+
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = animatedColorScheme,
         typography = Typography,
         content = content
     )

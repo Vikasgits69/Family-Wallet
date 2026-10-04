@@ -5,14 +5,15 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,14 +30,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -57,52 +63,52 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
 import com.example.data.CardNetwork
-import com.example.data.CardStatus
-import com.example.data.CardThemeColor
 import com.example.data.CreditCard
 import com.example.data.DebitCard
-import com.example.util.CurrencyFormatter
 
 /**
- * Solid Block Colors with Subtle Depth for Google Wallet Aesthetic
+ * Format Expiry to always show as MM/YY instead of MMYY
  */
-fun getCardBackgroundBrush(themeColor: CardThemeColor): Brush {
-    return when (themeColor) {
-        CardThemeColor.CHARCOAL -> Brush.linearGradient(
-            colors = listOf(Color(0xFF232738), Color(0xFF131622), Color(0xFF1E2235))
-        )
-        CardThemeColor.EMERALD -> Brush.linearGradient(
-            colors = listOf(Color(0xFF0F5A47), Color(0xFF07382B), Color(0xFF032219))
-        )
-        CardThemeColor.SAPPHIRE -> Brush.linearGradient(
-            colors = listOf(Color(0xFF1E3A8A), Color(0xFF172554), Color(0xFF0F172A))
-        )
-        CardThemeColor.INDIGO -> Brush.linearGradient(
-            colors = listOf(Color(0xFF4338CA), Color(0xFF312E81), Color(0xFF1E1B4B))
-        )
-        CardThemeColor.RUBY -> Brush.linearGradient(
-            colors = listOf(Color(0xFF881337), Color(0xFF4C0519), Color(0xFF28020D))
-        )
-        CardThemeColor.AMBER -> Brush.linearGradient(
-            colors = listOf(Color(0xFF92400E), Color(0xFF78350F), Color(0xFF451A03))
-        )
-        CardThemeColor.TITANIUM -> Brush.linearGradient(
-            colors = listOf(Color(0xFF854D0E), Color(0xFFA16207), Color(0xFF713F12))
-        )
+fun formatExpiryDisplay(raw: String): String {
+    val clean = raw.trim()
+    if (clean.contains("/")) return clean
+    val digits = clean.filter { it.isDigit() }
+    return when (digits.length) {
+        4 -> "${digits.take(2)}/${digits.drop(2)}"
+        3 -> "0${digits.take(1)}/${digits.drop(1)}"
+        else -> if (clean.isBlank()) "MM/YY" else clean
     }
 }
 
 /**
- * 3D Flippable Credit Card Component
+ * Solid Block Colors with Google Wallet Style Depth & Vibrancy
+ */
+fun getCardBackgroundBrush(colorHex: Long): Brush {
+    val base = Color(colorHex)
+    return Brush.linearGradient(
+        colors = listOf(
+            base,
+            base.copy(alpha = 0.88f),
+            base
+        )
+    )
+}
+
+/**
+ * 3D Flippable Credit Card Component with Google Wallet ExtraLarge Corners (28.dp)
+ * Supports dragging horizontally (left-to-right or right-to-left) to reveal expanded details!
  */
 @Composable
 fun InteractiveCreditCardItem(
@@ -113,102 +119,119 @@ fun InteractiveCreditCardItem(
     onToggleMask: () -> Unit,
     modifier: Modifier = Modifier,
     memberName: String? = null,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
     onCopyNumber: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val haptic = LocalHapticFeedback.current
+    var isExpanded by remember { mutableStateOf(false) }
 
-    // Smooth 3D Flip animation
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
         animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
-        label = "card_3d_flip"
+        label = "credit_card_flip"
     )
 
     val isFrontVisible = rotation <= 90f
-    val brush = getCardBackgroundBrush(card.themeColor)
+    val brush = getCardBackgroundBrush(card.colorHex)
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1.586f) // Standard ID-1 ISO card aspect ratio
-            .graphicsLayer {
-                rotationY = rotation
-                cameraDistance = 14f * density
-            }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onFlip()
-            }
-            .testTag("credit_card_${card.id}"),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp, pressedElevation = 10.dp)
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .background(brush)
-        ) {
-            // Subtle geometric mesh lines for authentic Google Wallet card finish
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeColor = Color.White.copy(alpha = 0.04f)
-                drawLine(
-                    color = strokeColor,
-                    start = Offset(0f, size.height * 0.3f),
-                    end = Offset(size.width, size.height * 0.8f),
-                    strokeWidth = 2f
-                )
-                drawLine(
-                    color = strokeColor,
-                    start = Offset(0f, size.height * 0.7f),
-                    end = Offset(size.width * 0.8f, 0f),
-                    strokeWidth = 2f
-                )
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.03f),
-                    radius = size.width * 0.4f,
-                    center = Offset(size.width * 0.9f, size.height * 0.1f)
-                )
-            }
-
-            if (isFrontVisible) {
-                // FRONT OF CREDIT CARD
-                CreditCardFrontView(
-                    card = card,
-                    isUnmasked = isUnmasked,
-                    onToggleMask = onToggleMask,
-                    memberName = memberName,
-                    onCopy = {
-                        copyToClipboard(context, "Card Number", card.cardNumber)
-                        onCopyNumber?.invoke()
+                .fillMaxWidth()
+                .aspectRatio(1.586f)
+                .graphicsLayer {
+                    rotationY = rotation
+                    cameraDistance = 14f * density
+                }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { change, dragAmount ->
+                        if (abs(dragAmount) > 16) {
+                            isExpanded = !isExpanded
+                        }
                     }
-                )
-            } else {
-                // BACK OF CREDIT CARD (Rotated back to readable orientation)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { rotationY = 180f }
+                }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
                 ) {
-                    CreditCardBackView(
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onFlip()
+                }
+                .testTag("credit_card_${card.id}"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(card.colorHex)),
+            border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(brush)
+            ) {
+                if (isFrontVisible) {
+                    CreditCardFrontView(
                         card = card,
                         isUnmasked = isUnmasked,
-                        onCopyCvv = {
-                            copyToClipboard(context, "CVV", card.cvv)
+                        onToggleMask = onToggleMask,
+                        memberName = memberName,
+                        onEdit = onEdit,
+                        onDelete = onDelete,
+                        onCopy = {
+                            copyToClipboard(context, "Card Number", card.cardNumber)
+                            onCopyNumber?.invoke()
                         }
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { rotationY = 180f }
+                    ) {
+                        CreditCardBackView(
+                            card = card,
+                            isUnmasked = isUnmasked,
+                            onCopyCvv = {
+                                copyToClipboard(context, "CVV", card.cvv)
+                            }
+                        )
+                    }
                 }
             }
         }
+
+        // Expanded View revealing extra details
+        CardExpandedDetailsView(
+            isExpanded = isExpanded,
+            onToggleExpand = { isExpanded = !isExpanded },
+            linkedEmail = card.linkedEmail,
+            linkedPhone = card.linkedPhone,
+            issuanceDate = card.issuanceDate,
+            rewardPoints = if (card.ccRewardPoints > 0) "${card.ccRewardPoints} pts" else null,
+            statementDate = card.statementDate,
+            dueDate = card.dueDate,
+            remindExpiry = card.remindExpiry,
+            remindBillDate = card.remindBillDate,
+            remindDueDate = card.remindDueDate,
+            memberName = memberName,
+            colorHex = card.colorHex,
+            isCredit = true,
+            cardNumber = card.cardNumber,
+            cvv = card.cvv,
+            isUnmasked = isUnmasked,
+            onCopy = { label, text -> copyToClipboard(context, label, text) }
+        )
     }
 }
 
 /**
- * 3D Flippable Debit Card Component
+ * 3D Flippable Debit Card Component with Google Wallet ExtraLarge Corners (28.dp)
+ * Supports dragging horizontally (left-to-right or right-to-left) to reveal expanded details!
  */
 @Composable
 fun InteractiveDebitCardItem(
@@ -219,88 +242,115 @@ fun InteractiveDebitCardItem(
     onToggleMask: () -> Unit,
     modifier: Modifier = Modifier,
     memberName: String? = null,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
     onCopyNumber: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val haptic = LocalHapticFeedback.current
+    var isExpanded by remember { mutableStateOf(false) }
 
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
         animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
-        label = "debit_card_3d_flip"
+        label = "debit_card_flip"
     )
 
     val isFrontVisible = rotation <= 90f
-    val brush = getCardBackgroundBrush(card.themeColor)
+    val brush = getCardBackgroundBrush(card.colorHex)
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1.586f)
-            .graphicsLayer {
-                rotationY = rotation
-                cameraDistance = 14f * density
-            }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onFlip()
-            }
-            .testTag("debit_card_${card.id}"),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp, pressedElevation = 10.dp)
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .background(brush)
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeColor = Color.White.copy(alpha = 0.04f)
-                drawLine(
-                    color = strokeColor,
-                    start = Offset(size.width * 0.1f, 0f),
-                    end = Offset(size.width, size.height * 0.9f),
-                    strokeWidth = 2f
-                )
-            }
-
-            if (isFrontVisible) {
-                DebitCardFrontView(
-                    card = card,
-                    isUnmasked = isUnmasked,
-                    onToggleMask = onToggleMask,
-                    memberName = memberName,
-                    onCopy = {
-                        copyToClipboard(context, "Debit Card Number", card.cardNumber)
-                        onCopyNumber?.invoke()
+                .fillMaxWidth()
+                .aspectRatio(1.586f)
+                .graphicsLayer {
+                    rotationY = rotation
+                    cameraDistance = 14f * density
+                }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { change, dragAmount ->
+                        if (abs(dragAmount) > 16) {
+                            isExpanded = !isExpanded
+                        }
                     }
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { rotationY = 180f }
+                }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
                 ) {
-                    DebitCardBackView(
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onFlip()
+                }
+                .testTag("debit_card_${card.id}"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(card.colorHex)),
+            border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(brush)
+            ) {
+                if (isFrontVisible) {
+                    DebitCardFrontView(
                         card = card,
                         isUnmasked = isUnmasked,
-                        onCopyCvv = {
-                            copyToClipboard(context, "CVV", card.cvv)
+                        onToggleMask = onToggleMask,
+                        memberName = memberName,
+                        onEdit = onEdit,
+                        onDelete = onDelete,
+                        onCopy = {
+                            copyToClipboard(context, "Debit Card Number", card.cardNumber)
+                            onCopyNumber?.invoke()
                         }
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { rotationY = 180f }
+                    ) {
+                        DebitCardBackView(
+                            card = card,
+                            isUnmasked = isUnmasked,
+                            onCopyCvv = {
+                                copyToClipboard(context, "CVV", card.cvv)
+                            }
+                        )
+                    }
                 }
             }
         }
+
+        // Expanded View revealing extra details
+        CardExpandedDetailsView(
+            isExpanded = isExpanded,
+            onToggleExpand = { isExpanded = !isExpanded },
+            linkedEmail = card.linkedEmail,
+            linkedPhone = card.linkedPhone,
+            issuanceDate = card.issuanceDate,
+            rewardPoints = if (card.rewardPoints > 0) "${card.rewardPoints} pts" else null,
+            statementDate = "",
+            dueDate = "",
+            remindExpiry = card.remindExpiry,
+            remindBillDate = false,
+            remindDueDate = false,
+            memberName = memberName,
+            colorHex = card.colorHex,
+            isCredit = false,
+            cardNumber = card.cardNumber,
+            cvv = card.cvv,
+            isUnmasked = isUnmasked,
+            onCopy = { label, text -> copyToClipboard(context, label, text) }
+        )
     }
 }
-
-// ==========================================
-// FRONT VIEWS
-// ==========================================
 
 @Composable
 private fun CreditCardFrontView(
@@ -308,6 +358,8 @@ private fun CreditCardFrontView(
     isUnmasked: Boolean,
     onToggleMask: () -> Unit,
     memberName: String?,
+    onEdit: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
     onCopy: () -> Unit
 ) {
     Column(
@@ -316,7 +368,7 @@ private fun CreditCardFrontView(
             .padding(18.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Row 1: Bank Name, Member Badge & Card Network Logo
+        // Row 1: Bank Name, Card Name, Member Badge & Card Network Logo
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -334,16 +386,16 @@ private fun CreditCardFrontView(
                 Text(
                     text = card.cardName,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                    color = Color.White.copy(alpha = 0.8f)
+                    color = Color.White.copy(alpha = 0.85f)
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (memberName != null) {
+                if (!memberName.isNullOrBlank()) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White.copy(alpha = 0.15f))
+                            .background(Color.White.copy(alpha = 0.2f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -358,14 +410,31 @@ private fun CreditCardFrontView(
             }
         }
 
-        // Row 2: EMV Chip & Contactless Wave
+        // Row 2: Chip and CC Reward Points
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             EmvChipGraphic()
-            ContactlessWaveGraphic()
+
+            if (card.ccRewardPoints > 0) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.Stars, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(14.dp))
+                    Text(
+                        text = "${card.ccRewardPoints} pts",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+            }
         }
 
         // Row 3: Card Number with Masking Toggle and Copy Button
@@ -380,10 +449,7 @@ private fun CreditCardFrontView(
                 formatMaskedCardNumber(card.cardNumber)
             }
 
-            AnimatedContent(
-                targetState = displayNumber,
-                label = "card_number_anim"
-            ) { number ->
+            AnimatedContent(targetState = displayNumber, label = "card_num_anim") { number ->
                 Text(
                     text = number,
                     style = MaterialTheme.typography.titleLarge.copy(
@@ -396,22 +462,15 @@ private fun CreditCardFrontView(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onToggleMask,
-                    modifier = Modifier.size(32.dp)
-                ) {
+                IconButton(onClick = onToggleMask, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = if (isUnmasked) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (isUnmasked) "Mask card" else "Unmask card",
+                        contentDescription = "Mask toggle",
                         tint = Color.White.copy(alpha = 0.9f),
                         modifier = Modifier.size(18.dp)
                     )
                 }
-
-                IconButton(
-                    onClick = onCopy,
-                    modifier = Modifier.size(32.dp)
-                ) {
+                IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Outlined.ContentCopy,
                         contentDescription = "Copy number",
@@ -422,7 +481,7 @@ private fun CreditCardFrontView(
             }
         }
 
-        // Row 4: Cardholder Name, Expiry Date & Flip Indicator
+        // Row 4: Cardholder Name, Expiry, Bill/Due Date, and Edit/Delete
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -446,38 +505,30 @@ private fun CreditCardFrontView(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "VALID THRU",
+                    text = "EXPIRES",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.sp),
                     color = Color.White.copy(alpha = 0.6f)
                 )
                 Text(
-                    text = card.expiry,
+                    text = formatExpiryDisplay(card.expiry),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     ),
                     color = Color.White
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "Flip Card",
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Text(
-                        text = "3D Flip",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = Color.White
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onEdit != null) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Card", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                    }
+                }
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Card", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                    }
                 }
             }
         }
@@ -490,6 +541,8 @@ private fun DebitCardFrontView(
     isUnmasked: Boolean,
     onToggleMask: () -> Unit,
     memberName: String?,
+    onEdit: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
     onCopy: () -> Unit
 ) {
     Column(
@@ -513,18 +566,18 @@ private fun DebitCardFrontView(
                     color = Color.White
                 )
                 Text(
-                    text = "DEBIT CARD • ${card.linkedAccount}",
+                    text = "DEBIT • ${card.cardName}",
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                    color = Color.White.copy(alpha = 0.8f)
+                    color = Color.White.copy(alpha = 0.85f)
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (memberName != null) {
+                if (!memberName.isNullOrBlank()) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White.copy(alpha = 0.15f))
+                            .background(Color.White.copy(alpha = 0.2f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -541,11 +594,10 @@ private fun DebitCardFrontView(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             EmvChipGraphic()
-            ContactlessWaveGraphic()
         }
 
         Row(
@@ -559,10 +611,7 @@ private fun DebitCardFrontView(
                 formatMaskedCardNumber(card.cardNumber)
             }
 
-            AnimatedContent(
-                targetState = displayNumber,
-                label = "debit_number_anim"
-            ) { number ->
+            AnimatedContent(targetState = displayNumber, label = "debit_num_anim") { number ->
                 Text(
                     text = number,
                     style = MaterialTheme.typography.titleLarge.copy(
@@ -575,10 +624,7 @@ private fun DebitCardFrontView(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onToggleMask,
-                    modifier = Modifier.size(32.dp)
-                ) {
+                IconButton(onClick = onToggleMask, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = if (isUnmasked) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = "Mask toggle",
@@ -586,11 +632,7 @@ private fun DebitCardFrontView(
                         modifier = Modifier.size(18.dp)
                     )
                 }
-
-                IconButton(
-                    onClick = onCopy,
-                    modifier = Modifier.size(32.dp)
-                ) {
+                IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Outlined.ContentCopy,
                         contentDescription = "Copy number",
@@ -629,42 +671,30 @@ private fun DebitCardFrontView(
                     color = Color.White.copy(alpha = 0.6f)
                 )
                 Text(
-                    text = card.expiry,
+                    text = formatExpiryDisplay(card.expiry),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     ),
                     color = Color.White
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "Flip",
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Text(
-                        text = "3D Flip",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = Color.White
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onEdit != null) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Card", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                    }
+                }
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Card", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                    }
                 }
             }
         }
     }
 }
-
-// ==========================================
-// BACK OF CARDS
-// ==========================================
 
 @Composable
 private fun CreditCardBackView(
@@ -673,125 +703,107 @@ private fun CreditCardBackView(
     onCopyCvv: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // 1. Magnetic Stripe
+        // Magnetic Stripe
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp)
-                .background(Color(0xFF0F0F12))
+                .padding(top = 18.dp)
+                .height(42.dp)
+                .background(Color.Black)
         )
 
-        // 2. White Signature / CVV Panel
+        // Signature Strip & CVV Box
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Signature band
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFE2E8F0)),
+                    .height(36.dp)
+                    .background(Color.White)
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    text = "Authorized Signature • Not Valid Unless Signed",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                    color = Color(0xFF64748B),
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // CVV Box
-            Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = Color.White,
-                shadowElevation = 2.dp,
-                modifier = Modifier.clickable { onCopyCvv() }
-            ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier.fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "CVV:",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                        color = Color(0xFF1E293B)
+                        text = card.cardholderName.ifBlank { "Authorized Signature" },
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Cursive,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E3A8A), // Royal blue fountain ink signature
+                            fontSize = 17.sp
+                        )
                     )
                     Text(
-                        text = if (isUnmasked) card.cvv else "•••",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.ExtraBold
-                        ),
-                        color = Color(0xFF0F172A)
+                        text = "AUTH SIGN",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Color.LightGray,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
                 }
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFE2E8F0))
+                    .clickable { onCopyCvv() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isUnmasked) card.cvv else "•••",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                )
             }
         }
 
-        // 3. Vault & Informational Details
-        Column(
+        // Reminders & Dates row
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp)
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
+            Column {
+                if (card.statementDate.isNotBlank()) {
                     Text(
-                        text = "STATEMENT DATE",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = card.statementDate,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        text = "Bill Date: ${card.statementDate}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
                 }
-
-                Column(horizontalAlignment = Alignment.End) {
+                if (card.dueDate.isNotBlank()) {
                     Text(
-                        text = "PAYMENT DUE DATE",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = card.dueDate,
+                        text = "Due Date: ${card.dueDate}",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        color = Color(0xFFFFD54F)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "Limit: ${CurrencyFormatter.formatRupees(card.creditLimit, false)} • Fee: ${CurrencyFormatter.formatRupees(card.annualFee, false)}/yr",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                color = Color.White.copy(alpha = 0.85f)
-            )
-
-            Text(
-                text = "24x7 Customer Helpline: 1800 202 6161",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                color = Color.White.copy(alpha = 0.5f)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(Icons.Outlined.Refresh, contentDescription = "Flip back", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                Text(text = "Tap to flip", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            }
         }
     }
 }
@@ -803,16 +815,15 @@ private fun DebitCardBackView(
     onCopyCvv: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp)
-                .background(Color(0xFF0F0F12))
+                .padding(top = 18.dp)
+                .height(42.dp)
+                .background(Color.Black)
         )
 
         Row(
@@ -820,183 +831,129 @@ private fun DebitCardBackView(
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFE2E8F0)),
+                    .height(36.dp)
+                    .background(Color.White)
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    text = "Authorized Signature • Bank Property",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                    color = Color(0xFF64748B),
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = Color.White,
-                shadowElevation = 2.dp,
-                modifier = Modifier.clickable { onCopyCvv() }
-            ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier.fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "CVV:",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                        color = Color(0xFF1E293B)
+                        text = card.cardholderName.ifBlank { "Authorized Signature" },
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Cursive,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E3A8A), // Royal blue fountain ink signature
+                            fontSize = 17.sp
+                        )
                     )
                     Text(
-                        text = if (isUnmasked) card.cvv else "•••",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.ExtraBold
-                        ),
-                        color = Color(0xFF0F172A)
+                        text = "AUTH SIGN",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Color.LightGray,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
                 }
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFE2E8F0))
+                    .clickable { onCopyCvv() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isUnmasked) card.cvv else "•••",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                )
             }
         }
 
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp)
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "ATM DAILY LIMIT",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = CurrencyFormatter.formatRupees(card.atmLimit, false),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "POS/ONLINE LIMIT",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = CurrencyFormatter.formatRupees(card.posLimit, false),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
             Text(
-                text = "Linked: ${card.linkedAccount} • 24x7 Helpline: 1800 11 2211",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                color = Color.White.copy(alpha = 0.5f)
+                text = "Issuance: ${card.issuanceDate.ifBlank { "N/A" }}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.8f)
             )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(Icons.Outlined.Refresh, contentDescription = "Flip back", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                Text(text = "Tap to flip", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            }
         }
     }
 }
 
-// ==========================================
-// BADGES & GRAPHICS
-// ==========================================
-
+/**
+ * Authentic Network Logos for RuPay, Visa, Mastercard, Amex
+ */
 @Composable
 fun CardNetworkBadge(network: CardNetwork) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(
-                when (network) {
-                    CardNetwork.RUPAY -> Color(0xFF0C2340) // RuPay Navy Deep Blue
-                    CardNetwork.VISA -> Color(0xFF1434CB)
-                    CardNetwork.MASTERCARD -> Color(0xFFEB001B)
-                    CardNetwork.AMEX -> Color(0xFF006FCF)
-                }
-            )
-            .border(
-                1.dp,
-                when (network) {
-                    CardNetwork.RUPAY -> Color(0xFFF27922) // RuPay Orange Border
-                    else -> Color.White.copy(alpha = 0.3f)
-                },
-                RoundedCornerShape(6.dp)
-            )
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = Color.White.copy(alpha = 0.18f),
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
-        when (network) {
-            CardNetwork.RUPAY -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // RuPay Orange and Green Flag Accent
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFF27922))
-                    )
+        Box(modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)) {
+            when (network) {
+                CardNetwork.RUPAY -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFF27922)))
+                        Text(
+                            text = "RuPay",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, letterSpacing = 0.5.sp),
+                            color = Color.White
+                        )
+                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF0F9D58)))
+                    }
+                }
+                CardNetwork.VISA -> {
                     Text(
-                        text = "RuPay",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.5.sp
-                        ),
+                        text = "VISA",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, letterSpacing = 1.sp),
                         color = Color.White
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF0F9D58))
+                }
+                CardNetwork.MASTERCARD -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy((-4).dp)
+                    ) {
+                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color(0xFFEB001B)))
+                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color(0xFFF79E1B).copy(alpha = 0.9f)))
+                    }
+                }
+                CardNetwork.AMEX -> {
+                    Text(
+                        text = "AMEX",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, letterSpacing = 1.sp),
+                        color = Color(0xFF60A5FA)
                     )
                 }
-            }
-            CardNetwork.VISA -> {
-                Text(
-                    text = "VISA",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp
-                    ),
-                    color = Color.White
-                )
-            }
-            CardNetwork.MASTERCARD -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFEB001B)))
-                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFF79E1B)))
-                }
-            }
-            CardNetwork.AMEX -> {
-                Text(
-                    text = "AMEX",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
             }
         }
     }
@@ -1005,61 +962,17 @@ fun CardNetworkBadge(network: CardNetwork) {
 @Composable
 fun EmvChipGraphic() {
     Surface(
-        modifier = Modifier
-            .size(width = 38.dp, height = 28.dp),
+        modifier = Modifier.size(width = 38.dp, height = 28.dp),
         shape = RoundedCornerShape(5.dp),
-        color = Color(0xFFD4AF37), // Metallic Gold
+        color = Color(0xFFD4AF37),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8A6827))
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val lineColor = Color(0xFF7A5C20)
-            // Horizontal circuit line
-            drawLine(
-                color = lineColor,
-                start = Offset(0f, size.height / 2),
-                end = Offset(size.width, size.height / 2),
-                strokeWidth = 1.5f
-            )
-            // Vertical circuit lines
-            drawLine(
-                color = lineColor,
-                start = Offset(size.width * 0.35f, 0f),
-                end = Offset(size.width * 0.35f, size.height),
-                strokeWidth = 1.5f
-            )
-            drawLine(
-                color = lineColor,
-                start = Offset(size.width * 0.65f, 0f),
-                end = Offset(size.width * 0.65f, size.height),
-                strokeWidth = 1.5f
-            )
+            drawLine(color = lineColor, start = Offset(0f, size.height / 2), end = Offset(size.width, size.height / 2), strokeWidth = 1.5f)
+            drawLine(color = lineColor, start = Offset(size.width * 0.35f, 0f), end = Offset(size.width * 0.35f, size.height), strokeWidth = 1.5f)
+            drawLine(color = lineColor, start = Offset(size.width * 0.65f, 0f), end = Offset(size.width * 0.65f, size.height), strokeWidth = 1.5f)
         }
-    }
-}
-
-@Composable
-fun ContactlessWaveGraphic() {
-    Canvas(modifier = Modifier.size(24.dp)) {
-        val stroke = 2f
-        val color = Color.White.copy(alpha = 0.8f)
-        drawArc(
-            color = color,
-            startAngle = -45f,
-            sweepAngle = 90f,
-            useCenter = false,
-            topLeft = Offset(size.width * 0.2f, size.height * 0.2f),
-            size = androidx.compose.ui.geometry.Size(size.width * 0.6f, size.height * 0.6f),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
-        )
-        drawArc(
-            color = color,
-            startAngle = -45f,
-            sweepAngle = 90f,
-            useCenter = false,
-            topLeft = Offset(size.width * 0.4f, size.height * 0.35f),
-            size = androidx.compose.ui.geometry.Size(size.width * 0.4f, size.height * 0.4f),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
-        )
     }
 }
 
@@ -1077,7 +990,261 @@ private fun formatFullCardNumber(raw: String): String {
 
 private fun copyToClipboard(context: Context, label: String, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText(label, text)
+    // Strip all spaces when copying card number or CVV
+    val cleanText = if (label.contains("Card", ignoreCase = true) || label.contains("Number", ignoreCase = true) || label.contains("CVV", ignoreCase = true)) {
+        text.replace(" ", "").trim()
+    } else {
+        text.trim()
+    }
+    val clip = ClipData.newPlainText(label, cleanText)
     clipboard.setPrimaryClip(clip)
-    Toast.makeText(context, "$label copied to clipboard!", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, "$label copied (spaces removed)!", Toast.LENGTH_SHORT).show()
+}
+
+@Composable
+fun CardExpandedDetailsView(
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    linkedEmail: String,
+    linkedPhone: String,
+    issuanceDate: String,
+    rewardPoints: String?,
+    statementDate: String,
+    dueDate: String,
+    remindExpiry: Boolean,
+    remindBillDate: Boolean,
+    remindDueDate: Boolean,
+    memberName: String?,
+    colorHex: Long,
+    isCredit: Boolean,
+    cardNumber: String,
+    cvv: String,
+    isUnmasked: Boolean,
+    onCopy: (String, String) -> Unit
+) {
+    val accent = Color(colorHex)
+
+    // Expand / collapse hint pill
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleExpand() }
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.SwapHoriz,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = if (isExpanded) "Hide details (drag or tap)" else "Swipe horizontally or tap for full details",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+
+    AnimatedVisibility(
+        visible = isExpanded,
+        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+    ) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.5.dp, accent.copy(alpha = 0.5f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                accent.copy(alpha = 0.10f),
+                                MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Header Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isCredit) "CREDIT CARD VAULT DOSSIER" else "DEBIT CARD VAULT DOSSIER",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+                            color = accent
+                        )
+
+                        if (!memberName.isNullOrBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = accent.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = memberName,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = accent
+                                )
+                            }
+                        }
+                    }
+
+                    // Linked Email & Phone section
+                    if (linkedEmail.isNotBlank() || linkedPhone.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (linkedEmail.isNotBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Email, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
+                                            Text("Email:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(linkedEmail, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        IconButton(onClick = { onCopy("Linked Email", linkedEmail) }, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Email", modifier = Modifier.size(13.dp))
+                                        }
+                                    }
+                                }
+                                if (linkedPhone.isNotBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Phone, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
+                                            Text("Phone:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(linkedPhone, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        IconButton(onClick = { onCopy("Linked Phone", linkedPhone) }, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Phone", modifier = Modifier.size(13.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Key Schedule & Numbers Grid
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (issuanceDate.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Text("ISSUANCE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(issuanceDate, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                                }
+                            }
+                        }
+
+                        if (!rewardPoints.isNullOrBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Text("REWARD POINTS", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(rewardPoints, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFFD97706)))
+                                }
+                            }
+                        }
+                    }
+
+                    // Credit Card Billing Cycle
+                    if (isCredit && (statementDate.isNotBlank() || dueDate.isNotBlank())) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (statementDate.isNotBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        Text("BILL STATEMENT", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(statementDate, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                                    }
+                                }
+                            }
+                            if (dueDate.isNotBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        Text("PAYMENT DUE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(dueDate, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Active reminder chips
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = accent, modifier = Modifier.size(13.dp))
+                        Text("Active Alerts:", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (remindExpiry) {
+                            Surface(shape = RoundedCornerShape(4.dp), color = accent.copy(alpha = 0.12f)) {
+                                Text("Expiry", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = accent)
+                            }
+                        }
+                        if (remindBillDate) {
+                            Surface(shape = RoundedCornerShape(4.dp), color = accent.copy(alpha = 0.12f)) {
+                                Text("Bill Date", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = accent)
+                            }
+                        }
+                        if (remindDueDate) {
+                            Surface(shape = RoundedCornerShape(4.dp), color = accent.copy(alpha = 0.12f)) {
+                                Text("Due Date", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = accent)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

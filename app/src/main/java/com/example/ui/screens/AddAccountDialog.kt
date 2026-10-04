@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -19,16 +20,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,64 +46,49 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.AccountType
+import coil.compose.AsyncImage
+import com.example.data.BankAccount
 import com.example.data.FamilyMember
+import com.example.ui.theme.BankColorOptions
+import java.util.UUID
 
-data class BankPreset(
-    val bankName: String,
-    val ifscPrefix: String,
-    val branch: String,
-    val minBalance: Double
-)
-
-val defaultBankPresets = listOf(
-    BankPreset("HDFC Bank", "HDFC0000240", "Connaught Place, New Delhi", 10000.0),
-    BankPreset("State Bank of India", "SBIN0001234", "Sector 18, Noida", 3000.0),
-    BankPreset("ICICI Bank", "ICIC0000011", "Cyber City, Gurugram", 10000.0),
-    BankPreset("Kotak Mahindra Bank", "KKBK0000182", "Indirapuram, Ghaziabad", 0.0),
-    BankPreset("Axis Bank", "UTIB0000054", "Kasturba Gandhi Marg, Delhi", 10000.0),
-    BankPreset("Punjab National Bank", "PUNB0024000", "Lajpat Nagar, New Delhi", 1000.0)
-)
+val bankAccountTypeOptions = listOf("Savings", "Current", "Overdraft", "Loan Account")
 
 @Composable
 fun AddAccountDialog(
     members: List<FamilyMember>,
+    accountToEdit: BankAccount? = null,
     onDismiss: () -> Unit,
-    onAddAccount: (
-        bankName: String,
-        accountType: AccountType,
-        accountNumber: String,
-        ifscCode: String,
-        branchName: String,
-        accountHolderName: String,
-        customerId: String,
-        linkedMobile: String,
-        linkedUpi: String,
-        minBalance: Double,
-        memberId: String
-    ) -> Unit
+    onSaveAccount: (BankAccount) -> Unit
 ) {
-    var selectedMemberId by remember { mutableStateOf(members.firstOrNull()?.id ?: "") }
+    val isEditing = accountToEdit != null
 
-    var bankName by remember { mutableStateOf("HDFC Bank") }
-    var accountType by remember { mutableStateOf(AccountType.SALARY) }
-    var accountNumber by remember { mutableStateOf("") }
-    var ifscCode by remember { mutableStateOf("HDFC0000240") }
-    var branchName by remember { mutableStateOf("Connaught Place, New Delhi") }
-    var accountHolderName by remember { mutableStateOf("VIKAS GUPTA") }
-    var customerId by remember { mutableStateOf("84729103") }
-    var linkedMobile by remember { mutableStateOf("+91 98765 43210") }
-    var linkedUpi by remember { mutableStateOf("vikasgupta@hdfcbank") }
-    var minBalanceText by remember { mutableStateOf("0") }
-
+    var bankName by remember { mutableStateOf(accountToEdit?.bankName ?: "") }
+    var accountType by remember { mutableStateOf(accountToEdit?.accountType ?: "Savings") }
+    var accountNumber by remember { mutableStateOf(accountToEdit?.accountNumber ?: "") }
+    var ifscCode by remember { mutableStateOf(accountToEdit?.ifscCode ?: "") }
+    var micrCode by remember { mutableStateOf(accountToEdit?.micrCode ?: "") }
+    var accountHolderName by remember { mutableStateOf(accountToEdit?.accountHolderName ?: "") }
+    var branchName by remember { mutableStateOf(accountToEdit?.branchName ?: "") }
+    var linkedEmail by remember { mutableStateOf(accountToEdit?.linkedEmail ?: "") }
+    var linkedPhone by remember { mutableStateOf(accountToEdit?.linkedPhone ?: "") }
+    var selectedMemberId by remember { mutableStateOf(accountToEdit?.memberId ?: "") }
+    var selectedColor by remember { mutableLongStateOf(accountToEdit?.colorHex ?: BankColorOptions.first()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text("Link Bank Account to Vault", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
-                Text("Store IFSC, branch, customer ID & linked UPI details", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = if (isEditing) "Edit Bank Account" else "Link Bank Account",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                )
+                Text(
+                    text = "Vault account details, IFSC, and MICR code securely",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         },
         text = {
@@ -107,85 +98,37 @@ fun AddAccountDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Presets
-                Text(
-                    text = "POPULAR INDIAN BANKS",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
+                OutlinedTextField(
+                    value = bankName,
+                    onValueChange = { bankName = it },
+                    label = { Text("Bank Name *") },
+                    placeholder = { Text("e.g. HDFC Bank, State Bank of India, ICICI") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(defaultBankPresets) { preset ->
-                        FilterChip(
-                            selected = (bankName == preset.bankName),
-                            onClick = {
-                                bankName = preset.bankName
-                                ifscCode = preset.ifscPrefix
-                                branchName = preset.branch
-                                minBalanceText = preset.minBalance.toLong().toString()
-                            },
-                            label = { Text(preset.bankName, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-
-                // Family Member Picker
-                Text(
-                    text = "ASSIGN TO FAMILY MEMBER",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(members) { member ->
-                        FilterChip(
-                            selected = (selectedMemberId == member.id),
-                            onClick = { selectedMemberId = member.id },
-                            label = { Text("${member.avatarEmoji} ${member.name}") }
-                        )
-                    }
-                }
-
-                // Account Type Selector
+                // Account Type Selector: Savings, Current, Overdraft, Loan Account
                 Text(
                     text = "ACCOUNT TYPE",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(AccountType.values()) { type ->
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(bankAccountTypeOptions) { type ->
                         FilterChip(
                             selected = accountType == type,
                             onClick = { accountType = type },
-                            label = { Text(type.label, style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(type) }
                         )
                     }
                 }
 
-                // Input Fields
-                OutlinedTextField(
-                    value = bankName,
-                    onValueChange = { bankName = it },
-                    label = { Text("Bank Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
                 OutlinedTextField(
                     value = accountNumber,
-                    onValueChange = { accountNumber = it },
-                    label = { Text("Account Number") },
-                    placeholder = { Text("501002345678912") },
+                    onValueChange = { accountNumber = it.filter { c -> c.isDigit() } },
+                    label = { Text("Account Number *") },
+                    placeholder = { Text("•••• •••• ••••") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -197,57 +140,18 @@ fun AddAccountDialog(
                 ) {
                     OutlinedTextField(
                         value = ifscCode,
-                        onValueChange = { ifscCode = it.uppercase() },
-                        label = { Text("IFSC Code") },
-                        placeholder = { Text("HDFC0000240") },
+                        onValueChange = { ifscCode = it.uppercase().take(11) },
+                        label = { Text("IFSC Code *") },
+                        placeholder = { Text("HDFC0000123") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
 
                     OutlinedTextField(
-                        value = customerId,
-                        onValueChange = { customerId = it },
-                        label = { Text("Customer ID / CIF") },
-                        placeholder = { Text("84729103") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = branchName,
-                    onValueChange = { branchName = it },
-                    label = { Text("Branch Location / City") },
-                    placeholder = { Text("Connaught Place, New Delhi") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = accountHolderName,
-                    onValueChange = { accountHolderName = it },
-                    label = { Text("Account Holder Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = linkedMobile,
-                        onValueChange = { linkedMobile = it },
-                        label = { Text("Registered Mobile") },
-                        placeholder = { Text("+91 98765 43210") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    OutlinedTextField(
-                        value = minBalanceText,
-                        onValueChange = { minBalanceText = it },
-                        label = { Text("Min Balance (₹)") },
+                        value = micrCode,
+                        onValueChange = { micrCode = it.filter { c -> c.isDigit() }.take(9) },
+                        label = { Text("MICR Code") },
+                        placeholder = { Text("9 Digits") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
@@ -255,19 +159,126 @@ fun AddAccountDialog(
                 }
 
                 OutlinedTextField(
-                    value = linkedUpi,
-                    onValueChange = { linkedUpi = it },
-                    label = { Text("Linked Bank UPI ID") },
-                    placeholder = { Text("vikasgupta@hdfcbank") },
+                    value = accountHolderName,
+                    onValueChange = { accountHolderName = it },
+                    label = { Text("Account Holder Name *") },
+                    placeholder = { Text("As per bank passbook") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                OutlinedTextField(
+                    value = branchName,
+                    onValueChange = { branchName = it },
+                    label = { Text("Branch Name / City") },
+                    placeholder = { Text("e.g. Connaught Place, New Delhi") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Linked Contact (Email & Phone Number for Bank Alerts/OTP)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = linkedEmail,
+                        onValueChange = { linkedEmail = it },
+                        label = { Text("Linked Email") },
+                        placeholder = { Text("alerts@bank.com") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Email),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    OutlinedTextField(
+                        value = linkedPhone,
+                        onValueChange = { linkedPhone = it },
+                        label = { Text("Linked Phone") },
+                        placeholder = { Text("+91 9876543210") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Color Picker / Accent Selection Specifically for Bank Accounts (Google Wallet style)
+                Text(
+                    text = "BANK ACCOUNT ACCENT COLOR",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(BankColorOptions) { colorVal ->
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(colorVal))
+                                .border(
+                                    width = if (selectedColor == colorVal) 3.dp else 1.dp,
+                                    color = if (selectedColor == colorVal) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable { selectedColor = colorVal },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (selectedColor == colorVal) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+
+                // Assigned Family Member Picker
+                Text(
+                    text = "ASSIGN TO FAMILY MEMBER",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedMemberId.isBlank(),
+                            onClick = { selectedMemberId = "" },
+                            label = { Text("Unassigned") }
+                        )
+                    }
+                    items(members) { member ->
+                        FilterChip(
+                            selected = selectedMemberId == member.id,
+                            onClick = { selectedMemberId = member.id },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (!member.profilePictureUri.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = com.example.util.ImageModelResolver.resolve(member.profilePictureUri),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp).clip(CircleShape)
+                                        )
+                                    } else {
+                                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
+                                    Text(member.name)
+                                }
+                            }
+                        )
+                    }
+                }
+
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
             }
@@ -276,31 +287,41 @@ fun AddAccountDialog(
             Button(
                 onClick = {
                     if (bankName.isBlank()) {
-                        errorMessage = "Please enter bank name"
+                        errorMessage = "Please enter Bank Name"
                         return@Button
                     }
-                    if (accountNumber.isBlank() || accountNumber.length < 6) {
-                        errorMessage = "Please enter valid account number"
+                    if (accountNumber.length < 4) {
+                        errorMessage = "Please enter valid Account Number"
+                        return@Button
+                    }
+                    if (ifscCode.isBlank()) {
+                        errorMessage = "Please enter IFSC Code"
+                        return@Button
+                    }
+                    if (accountHolderName.isBlank()) {
+                        errorMessage = "Please enter Account Holder Name"
                         return@Button
                     }
 
-                    val minBal = minBalanceText.toDoubleOrNull() ?: 0.0
-                    onAddAccount(
-                        bankName,
-                        accountType,
-                        accountNumber,
-                        ifscCode,
-                        branchName,
-                        accountHolderName,
-                        customerId,
-                        linkedMobile,
-                        linkedUpi,
-                        minBal,
-                        selectedMemberId
+                    val account = BankAccount(
+                        id = accountToEdit?.id ?: "bank_${UUID.randomUUID().toString().take(8)}",
+                        bankName = bankName.trim(),
+                        accountType = accountType,
+                        accountNumber = accountNumber.trim(),
+                        ifscCode = ifscCode.trim(),
+                        micrCode = micrCode.trim(),
+                        accountHolderName = accountHolderName.trim(),
+                        branchName = branchName.trim(),
+                        memberId = selectedMemberId,
+                        colorHex = selectedColor,
+                        linkedEmail = linkedEmail.trim(),
+                        linkedPhone = linkedPhone.trim()
                     )
+                    onSaveAccount(account)
+                    onDismiss()
                 }
             ) {
-                Text("Link Account")
+                Text(if (isEditing) "Save Changes" else "Add Bank Account")
             }
         },
         dismissButton = {

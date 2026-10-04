@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,24 +21,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.QrCodeScanner
-import androidx.compose.material.icons.outlined.TouchApp
-import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,18 +57,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.CardNetwork
+import coil.compose.AsyncImage
 import com.example.data.NavigationTab
-import com.example.ui.components.CardNetworkBadge
-import com.example.ui.components.FloatingStatCard
-import com.example.ui.components.InteractiveCreditCardItem
-import com.example.ui.components.InteractiveDebitCardItem
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldMint
@@ -76,6 +75,7 @@ import com.example.ui.theme.IndigoAccent
 import com.example.ui.theme.RoseCrimson
 import com.example.ui.theme.VioletPurple
 import com.example.ui.viewmodel.FamilyWalletUiState
+import com.example.ui.viewmodel.UpcomingCardAlert
 import kotlinx.coroutines.delay
 
 @Composable
@@ -86,376 +86,551 @@ fun DashboardScreen(
     onOpenAddDebitCard: () -> Unit,
     onOpenAddAccount: () -> Unit,
     onOpenAddWallet: () -> Unit,
-    onToggleCardFlip: (String) -> Unit,
-    onToggleItemMask: (String) -> Unit,
+    onOpenAddMember: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isContentVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(50)
-        isContentVisible = true
-    }
+    // Immediate rendering with zero delay for snappy border and card loading
+    val isContentVisible = true
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .testTag("dashboard_screen"),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Staggered Hero Vault Status Header
-        item {
-            AnimatedVisibility(
-                visible = isContentVisible,
-                enter = slideInVertically(initialOffsetY = { 40 }, animationSpec = tween(350)) + fadeIn(tween(350))
-            ) {
-                VaultSecurityHeroHeader(uiState = uiState)
-            }
-        }
 
-        // 2. Informational Summary Cards Grid (2x2)
-        item {
-            AnimatedVisibility(
-                visible = isContentVisible,
-                enter = slideInVertically(initialOffsetY = { 60 }, animationSpec = tween(400)) + fadeIn(tween(400))
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "VAULT OVERVIEW",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            letterSpacing = 1.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        FloatingStatCard(
-                            title = "Credit Cards",
-                            value = "${uiState.activeCreditCardsCount}",
-                            subtitle = "${uiState.filteredCreditCards.count { it.network == CardNetwork.RUPAY }} on RuPay",
-                            icon = Icons.Outlined.CreditCard,
-                            accentColor = IndigoAccent,
-                            badgeText = "Active",
-                            modifier = Modifier.weight(1f),
-                            onClick = { onNavigateTab(NavigationTab.CARDS) }
-                        )
-
-                        FloatingStatCard(
-                            title = "Debit Cards",
-                            value = "${uiState.activeDebitCardsCount}",
-                            subtitle = "ATM & POS limits",
-                            icon = Icons.Outlined.Payments,
-                            accentColor = EmeraldMint,
-                            badgeText = "Verified",
-                            modifier = Modifier.weight(1f),
-                            onClick = { onNavigateTab(NavigationTab.CARDS) }
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        FloatingStatCard(
-                            title = "Bank Accounts",
-                            value = "${uiState.totalBankAccountsCount}",
-                            subtitle = "IFSC & UPI linked",
-                            icon = Icons.Outlined.AccountBalance,
-                            accentColor = CyanAccent,
-                            badgeText = "Savings/Salary",
-                            modifier = Modifier.weight(1f),
-                            onClick = { onNavigateTab(NavigationTab.ACCOUNTS) }
-                        )
-
-                        FloatingStatCard(
-                            title = "Online Wallets",
-                            value = "${uiState.totalOnlineWalletsCount}",
-                            subtitle = "Paytm, PhonePe, GPay",
-                            icon = Icons.Outlined.AccountBalanceWallet,
-                            accentColor = AmberGold,
-                            badgeText = "KYC Full",
-                            modifier = Modifier.weight(1f),
-                            onClick = { onNavigateTab(NavigationTab.WALLETS) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 3. Primary Informational Actions Bar (Strictly Vault Actions: + Card, + Account, + Wallet)
-        item {
-            AnimatedVisibility(
-                visible = isContentVisible,
-                enter = slideInVertically(initialOffsetY = { 80 }, animationSpec = tween(450)) + fadeIn(tween(450))
-            ) {
-                QuickVaultActionsGrid(
-                    onAddCreditCard = onOpenAddCreditCard,
-                    onAddDebitCard = onOpenAddDebitCard,
-                    onAddAccount = onOpenAddAccount,
-                    onAddWallet = onOpenAddWallet
+        // Global Search Results (if user is searching)
+        if (uiState.searchQuery.isNotBlank()) {
+            item {
+                GlobalSearchResultsSection(
+                    uiState = uiState,
+                    onNavigateTab = onNavigateTab
                 )
             }
         }
 
-        // 4. RuPay National Payment Spotlight Banner
+        // 1. Vault Overview with Side-by-Side Visual Donut Chart
         item {
-            AnimatedVisibility(
-                visible = isContentVisible,
-                enter = slideInVertically(initialOffsetY = { 100 }, animationSpec = tween(500)) + fadeIn(tween(500))
-            ) {
-                RuPaySpotlightBanner(ruPayCount = uiState.ruPayCardsCount)
-            }
+            VaultOverviewWithChartCard(
+                uiState = uiState,
+                onNavigateTab = onNavigateTab
+            )
         }
 
-        // 5. Interactive 3D Card Stack Carousel
+        // 2. Dynamic Upcoming Action Card (Card Bill Dates & Payment Due Dates + Explicit Family Member Name)
         item {
-            AnimatedVisibility(
-                visible = isContentVisible,
-                enter = slideInVertically(initialOffsetY = { 120 }, animationSpec = tween(550)) + fadeIn(tween(550))
+            UpcomingActionCard(
+                alerts = uiState.upcomingAlerts,
+                onNavigateToCards = { onNavigateTab(NavigationTab.CARDS) },
+                onAddCard = onOpenAddCreditCard
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
+}
+
+/**
+ * Vault Overview Card with Visual Donut Chart Side-by-Side
+ */
+@Composable
+private fun VaultOverviewWithChartCard(
+    uiState: FamilyWalletUiState,
+    onNavigateTab: (NavigationTab) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("vault_overview_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column {
+                    Text(
+                        text = "VAULT OVERVIEW",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.2.sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${uiState.totalVaultAssetsCount} Total Stored Assets",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.clickable { onNavigateTab(NavigationTab.MEMBERS) }
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = "QUICK CARD ACCESS (TAP TO FLIP 3D)",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    letterSpacing = 1.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "3D Interactive Digital Cards",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
+                        Icon(Icons.Outlined.Group, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                         Text(
-                            text = "View All (${uiState.filteredCreditCards.size + uiState.filteredDebitCards.size})",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.clickable { onNavigateTab(NavigationTab.CARDS) }
+                            text = "${uiState.members.size} Members",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                    }
-
-                    if (uiState.filteredCreditCards.isNotEmpty() || uiState.filteredDebitCards.isNotEmpty()) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            items(uiState.filteredCreditCards, key = { it.id }) { card ->
-                                val member = uiState.members.find { it.id == card.memberId }
-                                Box(modifier = Modifier.width(320.dp)) {
-                                    InteractiveCreditCardItem(
-                                        card = card,
-                                        isFlipped = uiState.isCardFlipped(card.id),
-                                        isUnmasked = uiState.isItemUnmasked(card.id),
-                                        onFlip = { onToggleCardFlip(card.id) },
-                                        onToggleMask = { onToggleItemMask(card.id) },
-                                        memberName = member?.name
-                                    )
-                                }
-                            }
-
-                            items(uiState.filteredDebitCards, key = { it.id }) { card ->
-                                val member = uiState.members.find { it.id == card.memberId }
-                                Box(modifier = Modifier.width(320.dp)) {
-                                    InteractiveDebitCardItem(
-                                        card = card,
-                                        isFlipped = uiState.isCardFlipped(card.id),
-                                        isUnmasked = uiState.isItemUnmasked(card.id),
-                                        onFlip = { onToggleCardFlip(card.id) },
-                                        onToggleMask = { onToggleItemMask(card.id) },
-                                        memberName = member?.name
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
-        }
 
-        // 6. Linked Bank Accounts Quick Glance
-        item {
-            AnimatedVisibility(
-                visible = isContentVisible,
-                enter = slideInVertically(initialOffsetY = { 140 }, animationSpec = tween(600)) + fadeIn(tween(600))
+            // Side-by-Side Content: Stat Breakdown (Left) + Visual Donut Chart (Right)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "LINKED BANK ACCOUNTS",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 1.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Manage",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.clickable { onNavigateTab(NavigationTab.ACCOUNTS) }
-                        )
-                    }
+                // Left: Asset Stat Items
+                Column(
+                    modifier = Modifier.weight(1.1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OverviewStatRow(
+                        label = "Credit Cards",
+                        count = uiState.filteredCreditCards.size,
+                        color = IndigoAccent,
+                        icon = Icons.Outlined.CreditCard,
+                        onClick = { onNavigateTab(NavigationTab.CARDS) }
+                    )
+                    OverviewStatRow(
+                        label = "Debit Cards",
+                        count = uiState.filteredDebitCards.size,
+                        color = EmeraldMint,
+                        icon = Icons.Outlined.Payments,
+                        onClick = { onNavigateTab(NavigationTab.CARDS) }
+                    )
+                    OverviewStatRow(
+                        label = "Bank Accounts",
+                        count = uiState.filteredBankAccounts.size,
+                        color = CyanAccent,
+                        icon = Icons.Outlined.AccountBalance,
+                        onClick = { onNavigateTab(NavigationTab.ACCOUNTS) }
+                    )
+                    OverviewStatRow(
+                        label = "Wallets & Gifts",
+                        count = uiState.filteredWalletsAndGiftCards.size,
+                        color = AmberGold,
+                        icon = Icons.Outlined.AccountBalanceWallet,
+                        onClick = { onNavigateTab(NavigationTab.WALLETS) }
+                    )
+                }
 
-                    uiState.filteredBankAccounts.take(2).forEach { account ->
-                        QuickBankItem(account = account, onClick = { onNavigateTab(NavigationTab.ACCOUNTS) })
+                // Right: Donut Chart
+                Box(
+                    modifier = Modifier
+                        .size(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    VaultDonutChart(
+                        creditCount = uiState.filteredCreditCards.size,
+                        debitCount = uiState.filteredDebitCards.size,
+                        bankCount = uiState.filteredBankAccounts.size,
+                        walletGiftCount = uiState.filteredWalletsAndGiftCards.size,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${uiState.totalVaultAssetsCount}",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Assets",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
-        }
-
-        // Bottom padding spacer
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
 
 @Composable
-private fun VaultSecurityHeroHeader(uiState: FamilyWalletUiState) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+private fun OverviewStatRow(
+    label: String,
+    count: Int,
+    color: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                text = "$count",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = color
+            )
+        }
+    }
+}
+
+/**
+ * Donut Chart for Vault Asset Distribution
+ */
+@Composable
+private fun VaultDonutChart(
+    creditCount: Int,
+    debitCount: Int,
+    bankCount: Int,
+    walletGiftCount: Int,
+    modifier: Modifier = Modifier
+) {
+    val total = creditCount + debitCount + bankCount + walletGiftCount
+
+    Canvas(modifier = modifier) {
+        val strokeWidth = 18.dp.toPx()
+        val diameter = size.minDimension - strokeWidth
+        val topLeft = Offset((size.width - diameter) / 2, (size.height - diameter) / 2)
+        val arcSize = Size(diameter, diameter)
+
+        if (total == 0) {
+            drawArc(
+                color = Color.LightGray.copy(alpha = 0.3f),
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth)
+            )
+            return@Canvas
+        }
+
+        var startAngle = -90f
+
+        val slices = listOf(
+            Pair(creditCount, IndigoAccent),
+            Pair(debitCount, EmeraldMint),
+            Pair(bankCount, CyanAccent),
+            Pair(walletGiftCount, AmberGold)
+        )
+
+        for ((count, color) in slices) {
+            if (count > 0) {
+                val sweep = (count.toFloat() / total) * 360f
+                drawArc(
+                    color = color,
+                    startAngle = startAngle,
+                    sweepAngle = sweep - 2f, // subtle gap
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth)
+                )
+                startAngle += sweep
+            }
+        }
+    }
+}
+
+/**
+ * Dynamic Upcoming Action Card: Card Bill Dates & Payment Due Dates + Explicit Family Member Name
+ */
+@Composable
+private fun UpcomingActionCard(
+    alerts: List<UpcomingCardAlert>,
+    onNavigateToCards: () -> Unit,
+    onAddCard: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("upcoming_action_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(RoseCrimson.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            tint = RoseCrimson,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ACTION REQUIRED",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.1.sp
+                            ),
+                            color = RoseCrimson
+                        )
+                        Text(
+                            text = "Upcoming Payments",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                TextButton(
+                    onClick = onNavigateToCards,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "View Cards",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            if (alerts.isNotEmpty()) {
+                alerts.take(3).forEach { alert ->
+                    UpcomingAlertItem(alert = alert, onClick = onNavigateToCards)
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onAddCard)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Event,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "No Card Reminders Set",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Add Bill Dates & Payment Due Dates on Credit Cards to track them here",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpcomingAlertItem(
+    alert: UpcomingCardAlert,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(EmeraldMint)
+                            .background(Color(alert.colorHex))
                     )
-                    Text(
-                        text = "END-TO-END ENCRYPTED VAULT",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = EmeraldMint
-                    )
+                    Column {
+                        Text(
+                            text = alert.cardName,
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = alert.bankName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                val memberName = uiState.selectedMember?.name ?: "All Family Members"
-                Text(
-                    text = "$memberName's Vault",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.5).sp
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Text(
-                    text = "Storing ${uiState.creditCards.size} Credit, ${uiState.debitCards.size} Debit, ${uiState.bankAccounts.size} Banks & ${uiState.onlineWallets.size} Wallets",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (alert.isDueDate) RoseCrimson.copy(alpha = 0.15f) else AmberGold.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = if (alert.isDueDate) "Due: ${alert.dueDate}" else "Bill: ${alert.statementDate}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = if (alert.isDueDate) RoseCrimson else AmberGold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+            // Explicit Family Member Name Badge at the bottom of the card
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = "Security Shield",
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Assigned Family Member",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "Assigned Member: ${alert.memberName}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
 }
 
+/**
+ * Quick Vault Action Buttons
+ */
 @Composable
-private fun QuickVaultActionsGrid(
+private fun QuickVaultActionsRow(
     onAddCreditCard: () -> Unit,
     onAddDebitCard: () -> Unit,
     onAddAccount: () -> Unit,
-    onAddWallet: () -> Unit
+    onAddWallet: () -> Unit,
+    onAddMember: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             text = "QUICK VAULT ACTIONS",
             style = MaterialTheme.typography.labelSmall.copy(
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.2.sp
             ),
             color = MaterialTheme.colorScheme.primary
         )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             VaultActionButton(
-                title = "+ Credit Card",
-                subtitle = "RuPay / VISA / Amex",
+                label = "+ Credit",
                 icon = Icons.Outlined.CreditCard,
                 color = IndigoAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onAddCreditCard
             )
-
             VaultActionButton(
-                title = "+ Debit Card",
-                subtitle = "ATM & POS limits",
+                label = "+ Debit",
                 icon = Icons.Outlined.Payments,
                 color = EmeraldMint,
                 modifier = Modifier.weight(1f),
                 onClick = onAddDebitCard
             )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
             VaultActionButton(
-                title = "+ Bank Account",
-                subtitle = "IFSC & Branch details",
+                label = "+ Bank",
                 icon = Icons.Outlined.AccountBalance,
                 color = CyanAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onAddAccount
             )
-
             VaultActionButton(
-                title = "+ Online Wallet",
-                subtitle = "Paytm, PhonePe, GPay",
+                label = "+ Wallet/Gift",
                 icon = Icons.Outlined.AccountBalanceWallet,
                 color = AmberGold,
                 modifier = Modifier.weight(1f),
@@ -467,183 +642,90 @@ private fun QuickVaultActionsGrid(
 
 @Composable
 private fun VaultActionButton(
-    title: String,
-    subtitle: String,
+    label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     color: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .testTag("action_${title.lowercase().replace(" ", "_")}"),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier.clickable(onClick = onClick),
+        shadowElevation = 1.dp
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(32.dp)
+                    .clip(CircleShape)
                     .background(color.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
-                    contentDescription = title,
+                    contentDescription = null,
                     tint = color,
                     modifier = Modifier.size(18.dp)
                 )
             }
-
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
         }
     }
 }
 
+/**
+ * Global Search Results Section on Dashboard
+ */
 @Composable
-private fun RuPaySpotlightBanner(ruPayCount: Int) {
+private fun GlobalSearchResultsSection(
+    uiState: FamilyWalletUiState,
+    onNavigateTab: (NavigationTab) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF0C2340) // RuPay Navy Blue
-        )
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF27922)))
-                    Text(
-                        text = "RuPay Priority Vault",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF0F9D58)))
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "GLOBAL SEARCH RESULTS FOR \"${uiState.searchQuery}\"",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Text(
+                text = "Found ${uiState.filteredCreditCards.size} Credit Cards, ${uiState.filteredDebitCards.size} Debit Cards, ${uiState.filteredBankAccounts.size} Bank Accounts, ${uiState.filteredWalletsAndGiftCards.size} Wallets/Gifts, ${uiState.filteredMembers.size} Family Profiles.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (uiState.filteredCreditCards.isNotEmpty() || uiState.filteredDebitCards.isNotEmpty()) {
+                    OutlinedButton(onClick = { onNavigateTab(NavigationTab.CARDS) }) {
+                        Text("View Cards (${uiState.filteredCreditCards.size + uiState.filteredDebitCards.size})")
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "$ruPayCount RuPay Cards Ready for UPI & Tap",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color.White.copy(alpha = 0.95f)
-                )
-
-                Text(
-                    text = "Zero MDR on domestic UPI transactions & enhanced airport lounge access.",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFF27922))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "NPCI",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
-                    color = Color.White
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickBankItem(
-    account: com.example.data.BankAccount,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AccountBalance,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                if (uiState.filteredBankAccounts.isNotEmpty()) {
+                    OutlinedButton(onClick = { onNavigateTab(NavigationTab.ACCOUNTS) }) {
+                        Text("View Banks (${uiState.filteredBankAccounts.size})")
+                    }
                 }
-
-                Column {
-                    Text(
-                        text = account.bankName,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "A/c •••• ${account.accountNumber.takeLast(4)} • IFSC: ${account.ifscCode}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (uiState.filteredWalletsAndGiftCards.isNotEmpty()) {
+                    OutlinedButton(onClick = { onNavigateTab(NavigationTab.WALLETS) }) {
+                        Text("View Wallets & Gifts")
+                    }
                 }
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = account.accountType.label.take(7),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.SemiBold
-                )
             }
         }
     }
