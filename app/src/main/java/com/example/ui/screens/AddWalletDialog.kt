@@ -1,5 +1,11 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,9 +13,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -18,20 +28,39 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -42,6 +71,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -49,13 +80,20 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.FamilyMember
 import com.example.data.WalletOrGiftCard
+import com.example.ui.components.AttachmentViewerSheet
+import com.example.ui.components.CustomColorPickerDialog
 import com.example.ui.theme.CardColorBlockOptions
+import com.example.util.AttachmentFileManager
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 val giftCardPresets = listOf("Amazon", "Flipkart", "Apple Store", "Zara", "Starbucks", "Google Play", "MakeMyTrip")
 val walletPresets = listOf("Paytm", "PhonePe", "Google Pay (GPay)", "Amazon Pay", "CRED", "MobiKwik")
 val redemptionModes = listOf("Online / App", "In-Store / POS", "Voucher Code", "Scan QR")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddWalletDialog(
     members: List<FamilyMember>,
@@ -63,11 +101,16 @@ fun AddWalletDialog(
     onDismiss: () -> Unit,
     onSaveItem: (WalletOrGiftCard) -> Unit
 ) {
+    val context = LocalContext.current
     val isEditing = itemToEdit != null
     var isGiftCard by remember { mutableStateOf(itemToEdit?.isGiftCard ?: false) }
 
     var providerOrName by remember { mutableStateOf(itemToEdit?.providerOrName ?: "") }
     var cardNumberOrUpi by remember { mutableStateOf(itemToEdit?.cardNumberOrUpi ?: "") }
+    var giftCardPin by remember { mutableStateOf(itemToEdit?.giftCardPin ?: "") }
+    var vendorName by remember { mutableStateOf(itemToEdit?.vendorName ?: "") }
+    var remindExpiry by remember { mutableStateOf(itemToEdit?.remindExpiry ?: true) }
+    var showExpiryDatePicker by remember { mutableStateOf(false) }
     var amountText by remember { mutableStateOf(itemToEdit?.let { if (it.amount > 0) it.amount.toInt().toString() else "" } ?: "") }
     var expiryDate by remember { mutableStateOf(itemToEdit?.expiryDate ?: "") }
     var modeOfRedemption by remember { mutableStateOf(itemToEdit?.modeOfRedemption ?: "Online / App") }
@@ -76,7 +119,38 @@ fun AddWalletDialog(
     var kycStatus by remember { mutableStateOf(itemToEdit?.kycStatus ?: "Full KYC Verified") }
     var selectedMemberId by remember { mutableStateOf(itemToEdit?.memberId ?: "") }
     var selectedColor by remember { mutableLongStateOf(itemToEdit?.colorHex ?: CardColorBlockOptions[1]) }
+    var showCustomColorPicker by remember { mutableStateOf(false) }
+    
+    var barcodeOrReceiptImagePath by remember { mutableStateOf(itemToEdit?.barcodeOrReceiptImagePath) }
+    var attachmentPaths by remember { mutableStateOf(itemToEdit?.attachmentPaths ?: emptyList()) }
+    var activePreviewPath by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val barcodePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val path = AttachmentFileManager.copyUriToInternalStorage(context, uri)
+            if (path != null) {
+                barcodeOrReceiptImagePath = path
+                Toast.makeText(context, "Barcode/Receipt attached", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val extraAttachmentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val savedPaths = uris.mapNotNull { uri ->
+                AttachmentFileManager.copyUriToInternalStorage(context, uri)
+            }
+            if (savedPaths.isNotEmpty()) {
+                attachmentPaths = (attachmentPaths + savedPaths).distinct()
+                Toast.makeText(context, "Added ${savedPaths.size} attachment(s)", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -152,13 +226,38 @@ fun AddWalletDialog(
                     )
 
                     OutlinedTextField(
-                        value = cardNumberOrUpi,
-                        onValueChange = { cardNumberOrUpi = it },
-                        label = { Text("Card Number / Voucher Code / PIN *") },
-                        placeholder = { Text("e.g. AMZN-XXXX-YYYY or 16-digit code") },
+                        value = vendorName,
+                        onValueChange = { vendorName = it },
+                        label = { Text("Purchased From / Vendor") },
+                        placeholder = { Text("e.g. Amazon, Gyft, Woohoo, Retail Store") },
+                        leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = cardNumberOrUpi,
+                            onValueChange = { cardNumberOrUpi = it },
+                            label = { Text("Voucher Code *") },
+                            placeholder = { Text("e.g. AMZN-XXXX-YYYY") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.2f)
+                        )
+
+                        OutlinedTextField(
+                            value = giftCardPin,
+                            onValueChange = { giftCardPin = it },
+                            label = { Text("Redeem PIN") },
+                            placeholder = { Text("PIN / Code") },
+                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.9f)
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -178,9 +277,42 @@ fun AddWalletDialog(
                             value = expiryDate,
                             onValueChange = { expiryDate = it },
                             label = { Text("Expiry Date") },
-                            placeholder = { Text("12/28 or DD/MM/YY") },
+                            placeholder = { Text("DD MMM YYYY") },
+                            trailingIcon = {
+                                IconButton(onClick = { showExpiryDatePicker = true }) {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = "Pick Date")
+                                }
+                            },
                             singleLine = true,
+                            modifier = Modifier.weight(1.2f)
+                        )
+                    }
+
+                    // Remind on Expiry Day Option
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .clickable { remindExpiry = !remindExpiry }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Column {
+                                Text("Remind on Expiry Day", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                                Text("Receive vault notification on the day of expiry", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Switch(
+                            checked = remindExpiry,
+                            onCheckedChange = { remindExpiry = it }
                         )
                     }
 
@@ -263,9 +395,124 @@ fun AddWalletDialog(
                     )
                 }
 
+                // ATTACHMENTS SECTION: Barcode, QR Receipt, Voucher Scans
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "VOUCHER & BARCODE ATTACHMENTS",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    barcodePickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = if (barcodeOrReceiptImagePath != null) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)) else ButtonDefaults.outlinedButtonColors()
+                            ) {
+                                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (barcodeOrReceiptImagePath != null) "Barcode ✓" else "Barcode / QR", fontSize = 11.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    extraAttachmentLauncher.launch(arrayOf("image/*", "application/pdf"))
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+ Voucher PDF", fontSize = 11.sp)
+                            }
+                        }
+
+                        val allAttached = listOfNotNull(
+                            barcodeOrReceiptImagePath?.let { Pair("QR/Code", it) }
+                        ) + attachmentPaths.map { Pair("Voucher", it) }
+
+                        if (allAttached.isNotEmpty()) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(allAttached) { (tag, path) ->
+                                    val file = AttachmentFileManager.getFile(context, path)
+                                    val isPdf = AttachmentFileManager.isPdf(file)
+
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                        modifier = Modifier
+                                            .size(64.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { activePreviewPath = path }
+                                    ) {
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            if (isPdf) {
+                                                Column(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.Center
+                                                ) {
+                                                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(20.dp))
+                                                    Text("PDF", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            } else {
+                                                AsyncImage(
+                                                    model = file,
+                                                    contentDescription = tag,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.fillMaxSize()
+                                                )
+                                            }
+
+                                            Surface(
+                                                color = Color.Black.copy(alpha = 0.6f),
+                                                shape = RoundedCornerShape(bottomEnd = 4.dp),
+                                                modifier = Modifier.align(Alignment.TopStart)
+                                            ) {
+                                                Text(tag, color = Color.White, fontSize = 7.sp, modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp), fontWeight = FontWeight.Bold)
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    if (path == barcodeOrReceiptImagePath) barcodeOrReceiptImagePath = null
+                                                    else attachmentPaths = attachmentPaths.filter { it != path }
+                                                },
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .align(Alignment.TopEnd)
+                                            ) {
+                                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(12.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Solid Color Accent Block
                 Text(
-                    text = "SOLID COLOR BLOCK",
+                    text = "Select Color Accent",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -274,6 +521,30 @@ fun AddWalletDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    item {
+                        val isCustomSelected = !CardColorBlockOptions.contains(selectedColor)
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isCustomSelected) Color(selectedColor) else MaterialTheme.colorScheme.surfaceVariant)
+                                .border(
+                                    width = if (isCustomSelected) 3.dp else 1.dp,
+                                    color = if (isCustomSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable { showCustomColorPicker = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ColorLens,
+                                contentDescription = "Custom Accent Color",
+                                tint = if (isCustomSelected) Color.White else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
                     items(CardColorBlockOptions) { colorValue ->
                         Box(
                             modifier = Modifier
@@ -360,6 +631,9 @@ fun AddWalletDialog(
                         isGiftCard = isGiftCard,
                         providerOrName = providerOrName.trim(),
                         cardNumberOrUpi = cardNumberOrUpi.trim(),
+                        giftCardPin = giftCardPin.trim(),
+                        vendorName = vendorName.trim(),
+                        remindExpiry = remindExpiry,
                         amount = amt,
                         expiryDate = expiryDate.trim(),
                         modeOfRedemption = modeOfRedemption.trim(),
@@ -367,7 +641,9 @@ fun AddWalletDialog(
                         kycStatus = kycStatus.trim(),
                         registeredMobile = registeredMobile.trim(),
                         memberId = selectedMemberId,
-                        colorHex = selectedColor
+                        colorHex = selectedColor,
+                        barcodeOrReceiptImagePath = barcodeOrReceiptImagePath,
+                        attachmentPaths = attachmentPaths
                     )
                     onSaveItem(item)
                 }
@@ -381,4 +657,53 @@ fun AddWalletDialog(
             }
         }
     )
+
+    if (showExpiryDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showExpiryDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                        expiryDate = sdf.format(Date(millis))
+                    }
+                    showExpiryDatePicker = false
+                }) {
+                    Text("Select")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    expiryDate = ""
+                    showExpiryDatePicker = false
+                }) {
+                    Text("Clear")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (activePreviewPath != null) {
+        AttachmentViewerSheet(
+            attachmentPath = activePreviewPath,
+            documentTitle = "Wallet Attachment Viewer",
+            onDismiss = { activePreviewPath = null }
+        )
+    }
+
+    if (showCustomColorPicker) {
+        CustomColorPickerDialog(
+            initialColorHex = String.format("#%06X", 0xFFFFFF and selectedColor.toInt()),
+            title = "Custom Wallet Color Accent",
+            onColorSelected = { colorLong, _ ->
+                selectedColor = colorLong
+            },
+            onDismiss = { showCustomColorPicker = false }
+        )
+    }
 }

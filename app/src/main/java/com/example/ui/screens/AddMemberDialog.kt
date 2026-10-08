@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Face3
 import androidx.compose.material.icons.filled.Face4
 import androidx.compose.material.icons.filled.Favorite
@@ -44,6 +45,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.ui.components.CustomColorPickerDialog
 import com.example.data.FamilyMember
 import com.example.data.RelationshipCategory
 import java.io.File
@@ -113,6 +116,10 @@ fun AddMemberDialog(
     var customRelationshipText by remember { mutableStateOf(memberToEdit?.customRelationship ?: "") }
     var profilePictureUri by remember { mutableStateOf<String?>(memberToEdit?.profilePictureUri) }
     var selectedColor by remember { mutableLongStateOf(memberToEdit?.colorHex ?: 0xFF4F46E5) }
+    var showCustomColorPicker by remember { mutableStateOf(false) }
+    var isEmergencyContact by remember { mutableStateOf(memberToEdit?.isEmergencyContact ?: false) }
+    var emergencyPhone by remember { mutableStateOf(memberToEdit?.emergencyPhone ?: "") }
+    var bloodGroup by remember { mutableStateOf(memberToEdit?.bloodGroup ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Android Photo Picker - copies to persistent app internal storage so it NEVER goes blank on reload
@@ -282,7 +289,7 @@ fun AddMemberDialog(
 
                 // Color accent picker
                 Text(
-                    text = "PROFILE ACCENT COLOR",
+                    text = "Select Profile Color Accent",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -291,6 +298,30 @@ fun AddMemberDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    item {
+                        val isCustomSelected = !defaultMemberColors.contains(selectedColor)
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(if (isCustomSelected) Color(selectedColor) else MaterialTheme.colorScheme.surfaceVariant)
+                                .border(
+                                    width = if (isCustomSelected) 3.dp else 1.dp,
+                                    color = if (isCustomSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = CircleShape
+                                )
+                                .clickable { showCustomColorPicker = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ColorLens,
+                                contentDescription = "Custom Accent Color",
+                                tint = if (isCustomSelected) Color.White else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
                     items(defaultMemberColors) { colorValue ->
                         Box(
                             modifier = Modifier
@@ -309,6 +340,52 @@ fun AddMemberDialog(
                                 Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             }
                         }
+                    }
+                }
+
+                // Emergency ICE & Nominee Details
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Emergency Contact (ICE)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                                Text("Visible in Emergency Vault Quick Access", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = isEmergencyContact,
+                                onCheckedChange = { isEmergencyContact = it }
+                            )
+                        }
+
+                        if (isEmergencyContact) {
+                            OutlinedTextField(
+                                value = emergencyPhone,
+                                onValueChange = { emergencyPhone = it },
+                                label = { Text("Emergency Phone Number") },
+                                placeholder = { Text("+91 98765 43210") },
+                                singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = bloodGroup,
+                            onValueChange = { bloodGroup = it.uppercase() },
+                            label = { Text("Blood Group (Optional)") },
+                            placeholder = { Text("e.g. O+, B+, A-") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
 
@@ -346,7 +423,10 @@ fun AddMemberDialog(
                         relationshipCategory = selectedCategory.name,
                         customRelationship = customRelationshipText.trim(),
                         profilePictureUri = profilePictureUri,
-                        colorHex = selectedColor
+                        colorHex = selectedColor,
+                        isEmergencyContact = isEmergencyContact,
+                        emergencyPhone = emergencyPhone.trim(),
+                        bloodGroup = bloodGroup.trim()
                     )
 
                     onConfirm(updatedMember)
@@ -361,4 +441,15 @@ fun AddMemberDialog(
             }
         }
     )
+
+    if (showCustomColorPicker) {
+        CustomColorPickerDialog(
+            initialColorHex = String.format("#%06X", 0xFFFFFF and selectedColor.toInt()),
+            title = "Custom Member Color Accent",
+            onColorSelected = { colorLong, _ ->
+                selectedColor = colorLong
+            },
+            onDismiss = { showCustomColorPicker = false }
+        )
+    }
 }

@@ -5,9 +5,11 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,6 +36,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.outlined.CreditCard
@@ -45,6 +50,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
@@ -58,19 +64,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
+import kotlin.math.abs
+import kotlinx.coroutines.launch
 import com.example.data.CardNetwork
 import com.example.data.CreditCard
 import com.example.data.DebitCard
 import com.example.data.DisplayMode
+import com.example.data.NavigationTab
 import com.example.ui.components.InteractiveCreditCardItem
 import com.example.ui.components.InteractiveDebitCardItem
 import com.example.ui.viewmodel.FamilyWalletUiState
@@ -88,6 +100,8 @@ fun CardsScreen(
     onToggleItemMask: (String) -> Unit,
     onDeleteCreditCard: (String) -> Unit,
     onDeleteDebitCard: (String) -> Unit,
+    onToggleBillPaid: (String) -> Unit = {},
+    onOpenHelpline: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -95,6 +109,7 @@ fun CardsScreen(
 
     var cardToDelete by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // (id, isCredit)
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Immediate zero-latency rendering
     val isLoaded = true
@@ -162,9 +177,11 @@ fun CardsScreen(
                     onAddDebit = onOpenAddDebitCard
                 )
             } else {
-                when (uiState.displayMode) {
+                when (uiState.getDisplayModeForTab(NavigationTab.CARDS)) {
                     DisplayMode.CAROUSEL -> {
-                        // Material 3 HorizontalPager Carousel View with 3D Flip Cards & Page Indicators
+                        // Material 3 HorizontalPager Carousel View with Smooth 3D Flip, Page Interpolation, & Navigation Controls
+                        val density = androidx.compose.ui.platform.LocalDensity.current.density
+
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp),
@@ -172,7 +189,10 @@ fun CardsScreen(
                         ) {
                             if (creditList.isNotEmpty()) {
                                 item {
+                                    val creditPagerState = rememberPagerState(pageCount = { creditList.size })
+
                                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        // Header Row with Title and Smooth Prev/Next Controls
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -180,31 +200,111 @@ fun CardsScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "CREDIT CARDS (${creditList.size})",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    letterSpacing = 1.sp
-                                                ),
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                text = "Swipe • Tap to Flip 3D",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                            Column {
+                                                Text(
+                                                    text = "CREDIT CARDS (${creditList.size})",
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        letterSpacing = 1.sp
+                                                    ),
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = "Swipe to switch • Tap card to Flip 3D",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+
+                                            // Smooth Page Switcher Buttons
+                                            if (creditList.size > 1) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    IconButton(
+                                                        onClick = {
+                                                            if (creditPagerState.currentPage > 0) {
+                                                                coroutineScope.launch {
+                                                                    creditPagerState.animateScrollToPage(creditPagerState.currentPage - 1)
+                                                                }
+                                                            }
+                                                        },
+                                                        enabled = creditPagerState.currentPage > 0,
+                                                        modifier = Modifier.size(32.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.ChevronLeft,
+                                                            contentDescription = "Previous Credit Card",
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = if (creditPagerState.currentPage > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                        )
+                                                    }
+
+                                                    Surface(
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                    ) {
+                                                        Text(
+                                                            text = "${creditPagerState.currentPage + 1} / ${creditList.size}",
+                                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                        )
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = {
+                                                            if (creditPagerState.currentPage < creditList.size - 1) {
+                                                                coroutineScope.launch {
+                                                                    creditPagerState.animateScrollToPage(creditPagerState.currentPage + 1)
+                                                                }
+                                                            }
+                                                        },
+                                                        enabled = creditPagerState.currentPage < creditList.size - 1,
+                                                        modifier = Modifier.size(32.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.ChevronRight,
+                                                            contentDescription = "Next Credit Card",
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = if (creditPagerState.currentPage < creditList.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
 
-                                        val creditPagerState = rememberPagerState(pageCount = { creditList.size })
+                                        // Horizontal Pager with Smooth Page Transformation
                                         HorizontalPager(
                                             state = creditPagerState,
-                                            contentPadding = PaddingValues(horizontal = 24.dp),
+                                            contentPadding = PaddingValues(horizontal = 40.dp),
                                             pageSpacing = 16.dp,
+                                            beyondViewportPageCount = 1,
                                             modifier = Modifier.fillMaxWidth()
                                         ) { page ->
                                             val card = creditList[page]
                                             val member = uiState.members.find { it.id == card.memberId }
-                                            Box(modifier = Modifier.fillMaxWidth()) {
+
+                                            // Smooth carousel animation offset
+                                            val pageOffset = ((creditPagerState.currentPage - page) + creditPagerState.currentPageOffsetFraction)
+                                            val absOffset = kotlin.math.abs(pageOffset).coerceIn(0f, 1f)
+                                            val scale = lerp(0.92f, 1.0f, 1f - absOffset)
+                                            val alpha = lerp(0.65f, 1.0f, 1f - absOffset)
+                                            val rotationY = (pageOffset * -6f).coerceIn(-12f, 12f)
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .graphicsLayer {
+                                                        scaleX = scale
+                                                        scaleY = scale
+                                                        this.alpha = alpha
+                                                        this.rotationY = rotationY
+                                                        cameraDistance = 14f * density
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
                                                 InteractiveCreditCardItem(
                                                     card = card,
                                                     isFlipped = uiState.isCardFlipped(card.id),
@@ -213,12 +313,15 @@ fun CardsScreen(
                                                     onToggleMask = { onToggleItemMask(card.id) },
                                                     memberName = member?.name,
                                                     onEdit = { onOpenEditCreditCard(card) },
-                                                    onDelete = { cardToDelete = Pair(card.id, true) }
+                                                    onDelete = { cardToDelete = Pair(card.id, true) },
+                                                    onToggleBillPaid = { onToggleBillPaid(card.id) },
+                                                    onOpenHelpline = { onOpenHelpline(card.bankName) },
+                                                    modifier = Modifier.widthIn(max = 340.dp)
                                                 )
                                             }
                                         }
 
-                                        // Page Indicator Dots
+                                        // Interactive Page Indicator Dots/Pills
                                         if (creditList.size > 1) {
                                             Row(
                                                 modifier = Modifier
@@ -229,15 +332,25 @@ fun CardsScreen(
                                             ) {
                                                 repeat(creditList.size) { index ->
                                                     val isSelected = creditPagerState.currentPage == index
+                                                    val dotWidth by animateDpAsState(
+                                                        targetValue = if (isSelected) 20.dp else 6.dp,
+                                                        label = "credit_dot_anim_$index"
+                                                    )
                                                     Box(
                                                         modifier = Modifier
                                                             .padding(horizontal = 3.dp)
-                                                            .size(if (isSelected) 8.dp else 6.dp)
-                                                            .clip(CircleShape)
+                                                            .height(6.dp)
+                                                            .width(dotWidth)
+                                                            .clip(RoundedCornerShape(3.dp))
                                                             .background(
                                                                 if (isSelected) MaterialTheme.colorScheme.primary
-                                                                else MaterialTheme.colorScheme.outlineVariant
+                                                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
                                                             )
+                                                            .clickable {
+                                                                coroutineScope.launch {
+                                                                    creditPagerState.animateScrollToPage(index)
+                                                                }
+                                                            }
                                                     )
                                                 }
                                             }
@@ -248,7 +361,10 @@ fun CardsScreen(
 
                             if (debitList.isNotEmpty()) {
                                 item {
+                                    val debitPagerState = rememberPagerState(pageCount = { debitList.size })
+
                                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        // Header Row with Title and Smooth Prev/Next Controls
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -256,31 +372,111 @@ fun CardsScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "DEBIT CARDS (${debitList.size})",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    letterSpacing = 1.sp
-                                                ),
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                text = "Swipe • Tap to Flip 3D",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                            Column {
+                                                Text(
+                                                    text = "DEBIT CARDS (${debitList.size})",
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        letterSpacing = 1.sp
+                                                    ),
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = "Swipe to switch • Tap card to Flip 3D",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+
+                                            // Smooth Page Switcher Buttons
+                                            if (debitList.size > 1) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    IconButton(
+                                                        onClick = {
+                                                            if (debitPagerState.currentPage > 0) {
+                                                                coroutineScope.launch {
+                                                                    debitPagerState.animateScrollToPage(debitPagerState.currentPage - 1)
+                                                                }
+                                                            }
+                                                        },
+                                                        enabled = debitPagerState.currentPage > 0,
+                                                        modifier = Modifier.size(32.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.ChevronLeft,
+                                                            contentDescription = "Previous Debit Card",
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = if (debitPagerState.currentPage > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                        )
+                                                    }
+
+                                                    Surface(
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                    ) {
+                                                        Text(
+                                                            text = "${debitPagerState.currentPage + 1} / ${debitList.size}",
+                                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                        )
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = {
+                                                            if (debitPagerState.currentPage < debitList.size - 1) {
+                                                                coroutineScope.launch {
+                                                                    debitPagerState.animateScrollToPage(debitPagerState.currentPage + 1)
+                                                                }
+                                                            }
+                                                        },
+                                                        enabled = debitPagerState.currentPage < debitList.size - 1,
+                                                        modifier = Modifier.size(32.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.ChevronRight,
+                                                            contentDescription = "Next Debit Card",
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = if (debitPagerState.currentPage < debitList.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
 
-                                        val debitPagerState = rememberPagerState(pageCount = { debitList.size })
+                                        // Horizontal Pager with Smooth Page Transformation
                                         HorizontalPager(
                                             state = debitPagerState,
-                                            contentPadding = PaddingValues(horizontal = 24.dp),
+                                            contentPadding = PaddingValues(horizontal = 40.dp),
                                             pageSpacing = 16.dp,
+                                            beyondViewportPageCount = 1,
                                             modifier = Modifier.fillMaxWidth()
                                         ) { page ->
                                             val card = debitList[page]
                                             val member = uiState.members.find { it.id == card.memberId }
-                                            Box(modifier = Modifier.fillMaxWidth()) {
+
+                                            // Smooth carousel animation offset
+                                            val pageOffset = ((debitPagerState.currentPage - page) + debitPagerState.currentPageOffsetFraction)
+                                            val absOffset = kotlin.math.abs(pageOffset).coerceIn(0f, 1f)
+                                            val scale = lerp(0.92f, 1.0f, 1f - absOffset)
+                                            val alpha = lerp(0.65f, 1.0f, 1f - absOffset)
+                                            val rotationY = (pageOffset * -6f).coerceIn(-12f, 12f)
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .graphicsLayer {
+                                                        scaleX = scale
+                                                        scaleY = scale
+                                                        this.alpha = alpha
+                                                        this.rotationY = rotationY
+                                                        cameraDistance = 14f * density
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
                                                 InteractiveDebitCardItem(
                                                     card = card,
                                                     isFlipped = uiState.isCardFlipped(card.id),
@@ -289,12 +485,14 @@ fun CardsScreen(
                                                     onToggleMask = { onToggleItemMask(card.id) },
                                                     memberName = member?.name,
                                                     onEdit = { onOpenEditDebitCard(card) },
-                                                    onDelete = { cardToDelete = Pair(card.id, false) }
+                                                    onDelete = { cardToDelete = Pair(card.id, false) },
+                                                    onOpenHelpline = { onOpenHelpline(card.bankName) },
+                                                    modifier = Modifier.widthIn(max = 340.dp)
                                                 )
                                             }
                                         }
 
-                                        // Page Indicator Dots
+                                        // Interactive Page Indicator Dots/Pills
                                         if (debitList.size > 1) {
                                             Row(
                                                 modifier = Modifier
@@ -305,15 +503,25 @@ fun CardsScreen(
                                             ) {
                                                 repeat(debitList.size) { index ->
                                                     val isSelected = debitPagerState.currentPage == index
+                                                    val dotWidth by animateDpAsState(
+                                                        targetValue = if (isSelected) 20.dp else 6.dp,
+                                                        label = "debit_dot_anim_$index"
+                                                    )
                                                     Box(
                                                         modifier = Modifier
                                                             .padding(horizontal = 3.dp)
-                                                            .size(if (isSelected) 8.dp else 6.dp)
-                                                            .clip(CircleShape)
+                                                            .height(6.dp)
+                                                            .width(dotWidth)
+                                                            .clip(RoundedCornerShape(3.dp))
                                                             .background(
                                                                 if (isSelected) MaterialTheme.colorScheme.primary
-                                                                else MaterialTheme.colorScheme.outlineVariant
+                                                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
                                                             )
+                                                            .clickable {
+                                                                coroutineScope.launch {
+                                                                    debitPagerState.animateScrollToPage(index)
+                                                                }
+                                                            }
                                                     )
                                                 }
                                             }
@@ -327,7 +535,7 @@ fun CardsScreen(
                     DisplayMode.GRID -> {
                         // Grid View
                         LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 320.dp),
+                            columns = GridCells.Adaptive(minSize = 280.dp),
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -335,47 +543,57 @@ fun CardsScreen(
                         ) {
                             items(creditList, key = { it.id }) { card ->
                                 val member = uiState.members.find { it.id == card.memberId }
-                                InteractiveCreditCardItem(
-                                    card = card,
-                                    isFlipped = uiState.isCardFlipped(card.id),
-                                    isUnmasked = uiState.isItemUnmasked(card.id),
-                                    onFlip = { onToggleCardFlip(card.id) },
-                                    onToggleMask = { onToggleItemMask(card.id) },
-                                    memberName = member?.name,
-                                    onEdit = { onOpenEditCreditCard(card) },
-                                    onDelete = { cardToDelete = Pair(card.id, true) }
-                                )
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    InteractiveCreditCardItem(
+                                        card = card,
+                                        isFlipped = uiState.isCardFlipped(card.id),
+                                        isUnmasked = uiState.isItemUnmasked(card.id),
+                                        onFlip = { onToggleCardFlip(card.id) },
+                                        onToggleMask = { onToggleItemMask(card.id) },
+                                        memberName = member?.name,
+                                        onEdit = { onOpenEditCreditCard(card) },
+                                        onDelete = { cardToDelete = Pair(card.id, true) },
+                                        onToggleBillPaid = { onToggleBillPaid(card.id) },
+                                        onOpenHelpline = { onOpenHelpline(card.bankName) }
+                                    )
+                                }
                             }
                             items(debitList, key = { it.id }) { card ->
                                 val member = uiState.members.find { it.id == card.memberId }
-                                InteractiveDebitCardItem(
-                                    card = card,
-                                    isFlipped = uiState.isCardFlipped(card.id),
-                                    isUnmasked = uiState.isItemUnmasked(card.id),
-                                    onFlip = { onToggleCardFlip(card.id) },
-                                    onToggleMask = { onToggleItemMask(card.id) },
-                                    memberName = member?.name,
-                                    onEdit = { onOpenEditDebitCard(card) },
-                                    onDelete = { cardToDelete = Pair(card.id, false) }
-                                )
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    InteractiveDebitCardItem(
+                                        card = card,
+                                        isFlipped = uiState.isCardFlipped(card.id),
+                                        isUnmasked = uiState.isItemUnmasked(card.id),
+                                        onFlip = { onToggleCardFlip(card.id) },
+                                        onToggleMask = { onToggleItemMask(card.id) },
+                                        memberName = member?.name,
+                                        onEdit = { onOpenEditDebitCard(card) },
+                                        onDelete = { cardToDelete = Pair(card.id, false) },
+                                        onOpenHelpline = { onOpenHelpline(card.bankName) }
+                                    )
+                                }
                             }
                         }
                     }
 
                     DisplayMode.LIST -> {
-                        // List View: Full vertical layout
+                        // List View: Full vertical layout with centered max-width cards
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
-                            verticalArrangement = Arrangement.spacedBy(20.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             if (creditList.isNotEmpty()) {
                                 item {
-                                    Text(
-                                        text = "CREDIT CARDS (${creditList.size})",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                    Box(modifier = Modifier.fillMaxWidth().widthIn(max = 380.dp)) {
+                                        Text(
+                                            text = "CREDIT CARDS (${creditList.size})",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                                 items(creditList, key = { it.id }) { card ->
                                     val member = uiState.members.find { it.id == card.memberId }
@@ -387,19 +605,26 @@ fun CardsScreen(
                                         onToggleMask = { onToggleItemMask(card.id) },
                                         memberName = member?.name,
                                         onEdit = { onOpenEditCreditCard(card) },
-                                        onDelete = { cardToDelete = Pair(card.id, true) }
+                                        onDelete = { cardToDelete = Pair(card.id, true) },
+                                        onToggleBillPaid = { onToggleBillPaid(card.id) },
+                                        onOpenHelpline = { onOpenHelpline(card.bankName) },
+                                        modifier = Modifier.widthIn(max = 360.dp)
                                     )
                                 }
                             }
 
                             if (debitList.isNotEmpty()) {
                                 item {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Text(
-                                        text = "DEBIT CARDS (${debitList.size})",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                    Box(modifier = Modifier.fillMaxWidth().widthIn(max = 380.dp)) {
+                                        Column {
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Text(
+                                                text = "DEBIT CARDS (${debitList.size})",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
                                 items(debitList, key = { it.id }) { card ->
                                     val member = uiState.members.find { it.id == card.memberId }
@@ -411,7 +636,9 @@ fun CardsScreen(
                                         onToggleMask = { onToggleItemMask(card.id) },
                                         memberName = member?.name,
                                         onEdit = { onOpenEditDebitCard(card) },
-                                        onDelete = { cardToDelete = Pair(card.id, false) }
+                                        onDelete = { cardToDelete = Pair(card.id, false) },
+                                        onOpenHelpline = { onOpenHelpline(card.bankName) },
+                                        modifier = Modifier.widthIn(max = 360.dp)
                                     )
                                 }
                             }
@@ -547,12 +774,53 @@ private fun EmptyCardsView(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onAddCredit, shape = RoundedCornerShape(12.dp)) {
-                    Text("+ Add Credit Card")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onAddCredit,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("add_credit_card_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CreditCard,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Credit Card",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        maxLines = 1
+                    )
                 }
-                FilledTonalButton(onClick = onAddDebit, shape = RoundedCornerShape(12.dp)) {
-                    Text("+ Add Debit Card")
+
+                FilledTonalButton(
+                    onClick = onAddDebit,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("add_debit_card_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Payments,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Debit Card",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        maxLines = 1
+                    )
                 }
             }
         }

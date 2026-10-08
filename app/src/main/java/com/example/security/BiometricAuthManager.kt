@@ -71,4 +71,26 @@ object BiometricAuthManager {
 
         biometricPrompt.authenticate(promptInfo)
     }
+
+    fun authenticateForSecret(
+        activity: FragmentActivity,
+        secretName: String = "PIN / Password",
+        onSuccess: () -> Unit
+    ) {
+        val availability = checkAvailability(activity)
+        if (availability.canPrompt) {
+            promptBiometricAuthentication(
+                activity = activity,
+                title = "Fingerprint Authentication",
+                subtitle = "Authenticate to view $secretName",
+                negativeText = "Cancel",
+                onSuccess = onSuccess,
+                onError = { _, _ -> },
+                onFailed = {}
+            )
+        } else {
+            // If biometric sensor is not enrolled/present, grant access
+            onSuccess()
+        }
+    }
 }

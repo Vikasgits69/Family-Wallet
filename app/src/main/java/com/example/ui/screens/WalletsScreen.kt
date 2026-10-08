@@ -33,15 +33,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CardGiftcard
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.QrCode
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,14 +55,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -68,7 +74,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -77,12 +82,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.DisplayMode
+import com.example.data.NavigationTab
+import com.example.data.Subscription
 import com.example.data.WalletOrGiftCard
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.EmeraldMint
 import com.example.ui.theme.IndigoAccent
+import com.example.util.SafeVaultShareManager
+import com.example.util.VaultPreferencesManager
 import com.example.ui.viewmodel.FamilyWalletUiState
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,15 +99,18 @@ fun WalletsScreen(
     onOpenAddWallet: () -> Unit,
     onOpenEditWalletOrGiftCard: (WalletOrGiftCard) -> Unit,
     onDeleteWalletOrGiftCard: (String) -> Unit,
+    onOpenAddSubscription: () -> Unit,
+    onOpenEditSubscription: (Subscription) -> Unit,
+    onDeleteSubscription: (String) -> Unit,
+    onOpenSpendGiftCard: (WalletOrGiftCard) -> Unit,
+    onShowUpiQr: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabTitles = listOf("All", "Online Wallets", "Gift Cards")
+    val tabTitles = listOf("All", "Online Wallets", "Gift Cards", "Subscriptions")
     var itemToDelete by remember { mutableStateOf<WalletOrGiftCard?>(null) }
-
-    // Immediate zero-latency rendering
-    val isLoaded = true
+    var subscriptionToDelete by remember { mutableStateOf<Subscription?>(null) }
 
     val displayedItems by remember(uiState.filteredWalletsAndGiftCards, selectedTabIndex) {
         derivedStateOf {
@@ -113,15 +124,16 @@ fun WalletsScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Tabs: All, Online Wallets, Gift Cards
+            // Tabs: All, Online Wallets, Gift Cards, Subscriptions
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 1.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                PrimaryTabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTabIndex,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    edgePadding = 16.dp
                 ) {
                     tabTitles.forEachIndexed { index, title ->
                         Tab(
@@ -139,79 +151,109 @@ fun WalletsScreen(
                 }
             }
 
-            if (displayedItems.isEmpty()) {
-                EmptyWalletsAndGiftCardsView(onAddItem = onOpenAddWallet)
+            if (selectedTabIndex == 3) {
+                // Subscriptions Tab Content
+                if (uiState.filteredSubscriptions.isEmpty()) {
+                    EmptySubscriptionsView(onAddSubscription = onOpenAddSubscription)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("subscriptions_list"),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        items(uiState.filteredSubscriptions, key = { it.id }) { sub ->
+                            val member = uiState.members.find { it.id == sub.memberId }
+                            SubscriptionCard(
+                                subscription = sub,
+                                memberName = member?.name,
+                                onEdit = { onOpenEditSubscription(sub) },
+                                onDelete = { subscriptionToDelete = sub }
+                            )
+                        }
+                    }
+                }
             } else {
-                when (uiState.displayMode) {
-                    DisplayMode.CAROUSEL -> {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag("wallets_screen"),
-                            contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            item {
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    contentPadding = PaddingValues(horizontal = 16.dp)
-                                ) {
-                                    items(displayedItems, key = { it.id }) { item ->
-                                        val member = uiState.members.find { it.id == item.memberId }
-                                        Box(modifier = Modifier.width(320.dp)) {
-                                            WalletOrGiftCardItem(
-                                                item = item,
-                                                memberName = member?.name,
-                                                onEdit = { onOpenEditWalletOrGiftCard(item) },
-                                                onDelete = { itemToDelete = item },
-                                                onCopyText = { label, value -> copyToClipboard(context, label, value) }
-                                            )
+                // Wallets & Gift Cards Content
+                if (displayedItems.isEmpty()) {
+                    EmptyWalletsAndGiftCardsView(onAddItem = onOpenAddWallet)
+                } else {
+                    when (uiState.getDisplayModeForTab(NavigationTab.WALLETS)) {
+                        DisplayMode.CAROUSEL -> {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("wallets_screen"),
+                                contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                item {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp)
+                                    ) {
+                                        items(displayedItems, key = { it.id }) { item ->
+                                            val member = uiState.members.find { it.id == item.memberId }
+                                            Box(modifier = Modifier.width(320.dp)) {
+                                                WalletOrGiftCardItem(
+                                                    item = item,
+                                                    memberName = member?.name,
+                                                    onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                                    onDelete = { itemToDelete = item },
+                                                    onSpend = { onOpenSpendGiftCard(item) },
+                                                    onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                                    onCopyText = { label, value -> copyToClipboard(context, label, value) }
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    DisplayMode.GRID -> {
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 300.dp),
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag("wallets_screen"),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(displayedItems, key = { it.id }) { item ->
-                                val member = uiState.members.find { it.id == item.memberId }
-                                WalletOrGiftCardItem(
-                                    item = item,
-                                    memberName = member?.name,
-                                    onEdit = { onOpenEditWalletOrGiftCard(item) },
-                                    onDelete = { itemToDelete = item },
-                                    onCopyText = { label, value -> copyToClipboard(context, label, value) }
-                                )
-                            }
-                        }
-                    }
-
-                    DisplayMode.LIST -> {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag("wallets_screen"),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(displayedItems, key = { it.id }) { item ->
-                                AnimatedVisibility(visible = isLoaded, enter = slideInVertically(initialOffsetY = { 30 }) + fadeIn()) {
+                        DisplayMode.GRID -> {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 300.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("wallets_screen"),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(displayedItems, key = { it.id }) { item ->
                                     val member = uiState.members.find { it.id == item.memberId }
                                     WalletOrGiftCardItem(
                                         item = item,
                                         memberName = member?.name,
                                         onEdit = { onOpenEditWalletOrGiftCard(item) },
                                         onDelete = { itemToDelete = item },
+                                        onSpend = { onOpenSpendGiftCard(item) },
+                                        onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                        onCopyText = { label, value -> copyToClipboard(context, label, value) }
+                                    )
+                                }
+                            }
+                        }
+
+                        DisplayMode.LIST -> {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("wallets_screen"),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                items(displayedItems, key = { it.id }) { item ->
+                                    val member = uiState.members.find { it.id == item.memberId }
+                                    WalletOrGiftCardItem(
+                                        item = item,
+                                        memberName = member?.name,
+                                        onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                        onDelete = { itemToDelete = item },
+                                        onSpend = { onOpenSpendGiftCard(item) },
+                                        onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
                                         onCopyText = { label, value -> copyToClipboard(context, label, value) }
                                     )
                                 }
@@ -222,38 +264,36 @@ fun WalletsScreen(
             }
         }
 
-        // FAB to Add Wallet or Gift Card
+        // Floating Action Button
         FloatingActionButton(
-            onClick = onOpenAddWallet,
+            onClick = {
+                if (selectedTabIndex == 3) {
+                    onOpenAddSubscription()
+                } else {
+                    onOpenAddWallet()
+                }
+            },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(20.dp)
+                .padding(bottom = 16.dp, end = 16.dp)
                 .testTag("add_wallet_fab"),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Item")
-                Text("Add Wallet / Gift", fontWeight = FontWeight.Bold)
-            }
+            Icon(Icons.Default.Add, contentDescription = "Add Item")
         }
     }
 
-    // Delete Confirmation Dialog
-    itemToDelete?.let { item ->
-        val label = if (item.isGiftCard) "Gift Card" else "Wallet"
+    // Delete Confirmation Dialog for Wallet/GiftCard
+    if (itemToDelete != null) {
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
-            title = { Text("Delete $label?") },
-            text = { Text("Are you sure you want to remove ${item.providerOrName} from your vault?") },
+            title = { Text("Delete ${if (itemToDelete?.isGiftCard == true) "Gift Card" else "Wallet"}") },
+            text = { Text("Are you sure you want to remove \"${itemToDelete?.providerOrName}\" from your family vault?") },
             confirmButton = {
                 Button(
                     onClick = {
-                        onDeleteWalletOrGiftCard(item.id)
+                        itemToDelete?.let { onDeleteWalletOrGiftCard(it.id) }
                         itemToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -268,113 +308,112 @@ fun WalletsScreen(
             }
         )
     }
+
+    // Delete Confirmation Dialog for Subscription
+    if (subscriptionToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { subscriptionToDelete = null },
+            title = { Text("Delete Subscription") },
+            text = { Text("Are you sure you want to remove \"${subscriptionToDelete?.name}\" subscription?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        subscriptionToDelete?.let { onDeleteSubscription(it.id) }
+                        subscriptionToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { subscriptionToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
-/**
- * Solid Block Card for Wallet / Gift Card (Google Wallet Style, ExtraLarge 24-28dp corners)
- */
 @Composable
-private fun WalletOrGiftCardItem(
-    item: WalletOrGiftCard,
+private fun SubscriptionCard(
+    subscription: Subscription,
     memberName: String?,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onCopyText: (String, String) -> Unit
+    onDelete: () -> Unit
 ) {
-    val accentColor = Color(item.colorHex)
+    val accentColor = Color(subscription.colorHex)
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("wallet_gift_card_${item.id}"),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.5.dp, accentColor.copy(alpha = 0.65f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            accentColor.copy(alpha = 0.15f),
-                            accentColor.copy(alpha = 0.04f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            // Header Row: Icon, Service Name, Plan, Edit & Delete buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Header Row: Icon, Provider/Brand Name, Type Badge, Edit/Delete
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Surface(
+                        shape = CircleShape,
+                        color = accentColor.copy(alpha = 0.15f),
+                        modifier = Modifier.size(42.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(accentColor)
-                                .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = if (item.isGiftCard) Icons.Outlined.CardGiftcard else Icons.Outlined.AccountBalanceWallet,
+                                imageVector = Icons.Default.Subscriptions,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
+                                tint = accentColor,
+                                modifier = Modifier.size(22.dp)
                             )
-                        }
-
-                        Column {
-                            Text(
-                                text = item.providerOrName,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = accentColor.copy(alpha = 0.15f),
-                                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
-                            ) {
-                                Text(
-                                    text = if (item.isGiftCard) "Gift Card • ${if (item.amount > 0) "₹${item.amount.toInt()}" else "Voucher"}" else "Online Wallet • ${item.kycStatus}",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = accentColor
-                                )
-                            }
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    Column {
+                        Text(
+                            text = subscription.name,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (subscription.planName.isNotBlank()) {
+                            Text(
+                                text = subscription.planName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
 
-                // Identifier / Code Row
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = accentColor.copy(alpha = 0.08f),
-                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            // Cost & Billing Frequency Row
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = accentColor.copy(alpha = 0.08f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -383,32 +422,314 @@ private fun WalletOrGiftCardItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
+                        Text("COST", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            text = if (item.isGiftCard) "CARD NUMBER / VOUCHER PIN" else "VPA / UPI ID / PHONE",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = item.cardNumberOrUpi,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            ),
+                            text = "₹${subscription.cost.toInt()} / ${subscription.billingCycle}",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
-                    IconButton(
-                        onClick = { onCopyText(if (item.isGiftCard) "Voucher Code" else "UPI ID", item.cardNumberOrUpi) },
-                        modifier = Modifier.size(32.dp)
+                    if (subscription.nextRenewalDate.isNotBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = accentColor, modifier = Modifier.size(14.dp))
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("RENEWAL", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(subscription.nextRenewalDate, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Linked Payment & Member footer
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (subscription.linkedPaymentMethod.isNotBlank()) {
+                    Text(
+                        text = "💳 Paid via: ${subscription.linkedPaymentMethod}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
+                if (!memberName.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(accentColor.copy(alpha = 0.1f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = "Copy",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                        Icon(Icons.Default.Person, contentDescription = null, tint = accentColor, modifier = Modifier.size(12.dp))
+                        Text(memberName, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = accentColor)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WalletOrGiftCardItem(
+    item: WalletOrGiftCard,
+    memberName: String?,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSpend: () -> Unit,
+    onShowQr: () -> Unit,
+    onCopyText: (String, String) -> Unit
+) {
+    val accentColor = Color(item.colorHex)
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Header Row: Icon, Provider/Brand, Status Chip, Edit, Delete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = accentColor.copy(alpha = 0.15f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (item.isGiftCard) Icons.Filled.CardGiftcard else Icons.Outlined.AccountBalanceWallet,
+                                contentDescription = null,
+                                tint = accentColor,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    Column {
+                        Text(
+                            text = item.providerOrName,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = accentColor.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = if (item.isGiftCard) "Gift Card • ${if (item.amount > 0) "₹${item.amount.toInt()}" else "Voucher"}" else "Online Wallet • ${item.kycStatus}",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!item.isGiftCard && item.cardNumberOrUpi.isNotBlank()) {
+                        IconButton(onClick = onShowQr, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.QrCode, contentDescription = "Show QR", tint = accentColor, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            // Gift Card Remaining Balance Tracker with Spend Action
+            if (item.isGiftCard && item.initialAmount > 0) {
+                val balanceRatio = (item.currentBalance / item.initialAmount).coerceIn(0.0, 1.0).toFloat()
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = accentColor.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("REMAINING BALANCE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("₹${item.currentBalance.toInt()} / ₹${item.initialAmount.toInt()}", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = accentColor)
+                            }
+
+                            OutlinedButton(
+                                onClick = onSpend,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("- Spend", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { balanceRatio },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = if (balanceRatio > 0.2f) accentColor else MaterialTheme.colorScheme.error,
+                            trackColor = accentColor.copy(alpha = 0.2f)
                         )
                     }
+                }
+            }
+
+            // Identifier / Code Row
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = accentColor.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (item.isGiftCard && item.giftCardPin.isNotBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1.1f)) {
+                            Text(
+                                text = "VOUCHER CODE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 0.8.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = item.cardNumberOrUpi,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(
+                            onClick = { onCopyText("Voucher Code", item.cardNumberOrUpi) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Voucher", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                        }
+
+                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(accentColor.copy(alpha = 0.3f)))
+
+                        Column(modifier = Modifier.weight(0.9f)) {
+                            Text(
+                                text = "REDEEM PIN",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 0.8.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = item.giftCardPin,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(
+                            onClick = { onCopyText("Redeem PIN", item.giftCardPin) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy PIN", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = if (item.isGiftCard) "VOUCHER CODE" else "VPA / UPI ID / PHONE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = item.cardNumberOrUpi,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { onCopyText(if (item.isGiftCard) "Voucher Code" else "UPI ID", item.cardNumberOrUpi) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ContentCopy,
+                                contentDescription = "Copy",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Vendor Name (if available)
+            if (item.isGiftCard && item.vendorName.isNotBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(accentColor.copy(alpha = 0.08f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Icon(Icons.Default.Storefront, contentDescription = null, tint = accentColor, modifier = Modifier.size(14.dp))
+                    Text(
+                        text = "Purchased from: ${item.vendorName}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
 
@@ -425,7 +746,15 @@ private fun WalletOrGiftCardItem(
                             modifier = Modifier.weight(1f)
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
-                                Text("EXPIRES", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("EXPIRES", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (item.remindExpiry) {
+                                        Icon(Icons.Default.NotificationsActive, contentDescription = "Expiry Alert On", tint = accentColor, modifier = Modifier.size(11.dp))
+                                    }
+                                }
                                 Text(item.expiryDate, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
@@ -477,7 +806,6 @@ private fun WalletOrGiftCardItem(
         }
     }
 }
-}
 
 @Composable
 private fun EmptyWalletsAndGiftCardsView(onAddItem: () -> Unit) {
@@ -528,9 +856,64 @@ private fun EmptyWalletsAndGiftCardsView(onAddItem: () -> Unit) {
     }
 }
 
+@Composable
+private fun EmptySubscriptionsView(onAddSubscription: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Subscriptions,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            Text(
+                text = "No Recurring Subscriptions Tracked",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Track shared family OTT, music, cloud storage and utility bills (Netflix, Spotify, Prime, YouTube, Broadband) with renewal alerts.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            Button(onClick = onAddSubscription, shape = RoundedCornerShape(12.dp)) {
+                Text("+ Add Family Subscription")
+            }
+        }
+    }
+}
+
 private fun copyToClipboard(context: Context, label: String, text: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText(label, text)
-    clipboard.setPrimaryClip(clip)
-    Toast.makeText(context, "$label copied to clipboard!", Toast.LENGTH_SHORT).show()
+    val prefs = VaultPreferencesManager(context)
+    val autoClear = prefs.isClipboardAutoClearEnabled()
+    val timeout = prefs.getClipboardClearTimeout()
+    SafeVaultShareManager.copyWithSecurity(
+        context = context,
+        label = label,
+        text = text,
+        timeoutSeconds = timeout,
+        enableAutoClear = autoClear
+    )
 }

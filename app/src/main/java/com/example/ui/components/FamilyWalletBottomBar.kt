@@ -17,12 +17,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
@@ -101,21 +103,21 @@ fun FamilyWalletBottomBar(
             )
 
             BottomNavItem(
+                tab = NavigationTab.DOCUMENTS,
+                selected = currentTab == NavigationTab.DOCUMENTS,
+                icon = Icons.Outlined.Description,
+                selectedIcon = Icons.Filled.Description,
+                label = "Docs",
+                onClick = { onTabSelected(NavigationTab.DOCUMENTS) }
+            )
+
+            BottomNavItem(
                 tab = NavigationTab.MEMBERS,
                 selected = currentTab == NavigationTab.MEMBERS,
                 icon = Icons.Outlined.People,
                 selectedIcon = Icons.Filled.People,
                 label = "Family",
                 onClick = { onTabSelected(NavigationTab.MEMBERS) }
-            )
-
-            BottomNavItem(
-                tab = NavigationTab.SETTINGS,
-                selected = currentTab == NavigationTab.SETTINGS,
-                icon = Icons.Outlined.Settings,
-                selectedIcon = Icons.Filled.Settings,
-                label = "Settings",
-                onClick = { onTabSelected(NavigationTab.SETTINGS) }
             )
         }
     }

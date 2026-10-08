@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -10,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -22,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -30,15 +37,33 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -64,7 +89,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.example.ui.components.CustomColorPickerDialog
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -76,14 +104,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.data.BankAccount
 import com.example.data.CardNetwork
 import com.example.data.CreditCard
 import com.example.data.DebitCard
 import com.example.data.FamilyMember
+import com.example.ui.components.AttachmentViewerSheet
 import com.example.ui.components.CardNetworkBadge
 import com.example.ui.components.EmvChipGraphic
 import com.example.ui.components.getCardBackgroundBrush
 import com.example.ui.theme.CardColorBlockOptions
+import com.example.util.AttachmentFileManager
 import com.example.util.CardNumberVisualTransformation
 import com.example.util.ExpiryDateVisualTransformation
 import java.util.UUID
@@ -91,6 +122,9 @@ import java.util.UUID
 @Composable
 fun AddCardDialog(
     members: List<FamilyMember>,
+    existingCreditCards: List<CreditCard> = emptyList(),
+    existingDebitCards: List<DebitCard> = emptyList(),
+    existingBankAccounts: List<BankAccount> = emptyList(),
     creditCardToEdit: CreditCard? = null,
     debitCardToEdit: DebitCard? = null,
     initialIsCredit: Boolean = true,
@@ -101,6 +135,40 @@ fun AddCardDialog(
     val isEditingCredit = creditCardToEdit != null
     val isEditingDebit = debitCardToEdit != null
     val isEditing = isEditingCredit || isEditingDebit
+
+    // Remembered values from previous cards and accounts
+    val rememberedEmails = remember(existingCreditCards, existingDebitCards, existingBankAccounts) {
+        val list = mutableListOf<String>()
+        existingCreditCards.forEach { c -> if (c.linkedEmail.isNotBlank()) list.add(c.linkedEmail) }
+        existingDebitCards.forEach { d -> if (d.linkedEmail.isNotBlank()) list.add(d.linkedEmail) }
+        existingBankAccounts.forEach { a -> if (a.linkedEmail.isNotBlank()) list.add(a.linkedEmail) }
+        list.distinct()
+    }
+
+    val rememberedPhones = remember(existingCreditCards, existingDebitCards, existingBankAccounts) {
+        val list = mutableListOf<String>()
+        existingCreditCards.forEach { c -> if (c.linkedPhone.isNotBlank()) list.add(c.linkedPhone) }
+        existingDebitCards.forEach { d -> if (d.linkedPhone.isNotBlank()) list.add(d.linkedPhone) }
+        existingBankAccounts.forEach { a -> if (a.linkedPhone.isNotBlank()) list.add(a.linkedPhone) }
+        list.distinct()
+    }
+
+    val rememberedNames = remember(existingCreditCards, existingDebitCards, existingBankAccounts, members) {
+        val list = mutableListOf<String>()
+        existingCreditCards.forEach { c -> if (c.cardholderName.isNotBlank()) list.add(c.cardholderName) }
+        existingDebitCards.forEach { d -> if (d.cardholderName.isNotBlank()) list.add(d.cardholderName) }
+        existingBankAccounts.forEach { a -> if (a.accountHolderName.isNotBlank()) list.add(a.accountHolderName) }
+        members.forEach { m -> if (m.name.isNotBlank()) list.add(m.name) }
+        list.distinct()
+    }
+
+    val rememberedBanks = remember(existingCreditCards, existingDebitCards, existingBankAccounts) {
+        val list = mutableListOf("HDFC Bank", "State Bank of India", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "Bank of Baroda", "Punjab National Bank")
+        existingCreditCards.forEach { c -> if (c.bankName.isNotBlank()) list.add(c.bankName) }
+        existingDebitCards.forEach { d -> if (d.bankName.isNotBlank()) list.add(d.bankName) }
+        existingBankAccounts.forEach { a -> if (a.bankName.isNotBlank()) list.add(a.bankName) }
+        list.distinct()
+    }
 
     var isCreditCard by remember {
         mutableStateOf(if (isEditing) isEditingCredit else initialIsCredit)
@@ -129,16 +197,27 @@ fun AddCardDialog(
     var cvv by remember {
         mutableStateOf((creditCardToEdit?.cvv ?: debitCardToEdit?.cvv ?: "").filter { it.isDigit() }.take(4))
     }
-    var isCvvVisible by remember { mutableStateOf(false) }
+    var atmPin by remember {
+        mutableStateOf(creditCardToEdit?.atmPin ?: debitCardToEdit?.atmPin ?: "")
+    }
+    var cardPin by remember {
+        mutableStateOf(creditCardToEdit?.cardPin ?: debitCardToEdit?.cardPin ?: "")
+    }
 
     var cardholderName by remember {
-        mutableStateOf(creditCardToEdit?.cardholderName ?: debitCardToEdit?.cardholderName ?: "")
+        mutableStateOf(creditCardToEdit?.cardholderName ?: debitCardToEdit?.cardholderName ?: rememberedNames.firstOrNull() ?: "")
     }
     var linkedEmail by remember {
-        mutableStateOf(creditCardToEdit?.linkedEmail ?: debitCardToEdit?.linkedEmail ?: "")
+        mutableStateOf(creditCardToEdit?.linkedEmail ?: debitCardToEdit?.linkedEmail ?: rememberedEmails.firstOrNull() ?: "")
     }
     var linkedPhone by remember {
-        mutableStateOf(creditCardToEdit?.linkedPhone ?: debitCardToEdit?.linkedPhone ?: "")
+        mutableStateOf(creditCardToEdit?.linkedPhone ?: debitCardToEdit?.linkedPhone ?: rememberedPhones.firstOrNull() ?: "")
+    }
+    var customerCareNumber by remember {
+        mutableStateOf(creditCardToEdit?.customerCareNumber ?: debitCardToEdit?.customerCareNumber ?: "")
+    }
+    var supportEmail by remember {
+        mutableStateOf(creditCardToEdit?.supportEmail ?: debitCardToEdit?.supportEmail ?: "")
     }
     var issuanceDate by remember {
         mutableStateOf(creditCardToEdit?.issuanceDate ?: debitCardToEdit?.issuanceDate ?: "")
@@ -165,6 +244,26 @@ fun AddCardDialog(
     var remindDueDate by remember {
         mutableStateOf(creditCardToEdit?.remindDueDate ?: true)
     }
+    var isBillPaid by remember { mutableStateOf(creditCardToEdit?.isBillPaid ?: false) }
+    var domesticPosLimitText by remember {
+        mutableStateOf(
+            creditCardToEdit?.let { if (it.domesticPosLimit > 0) it.domesticPosLimit.toString() else "" }
+                ?: debitCardToEdit?.let { if (it.domesticPosLimit > 0) it.domesticPosLimit.toString() else "" }
+                ?: ""
+        )
+    }
+    var dailyAtmLimitText by remember {
+        mutableStateOf(
+            creditCardToEdit?.let { if (it.atmDailyLimit > 0) it.atmDailyLimit.toString() else "" }
+                ?: debitCardToEdit?.let { if (it.atmDailyLimit > 0) it.atmDailyLimit.toString() else "" }
+                ?: ""
+        )
+    }
+    var internationalUsage by remember {
+        mutableStateOf(
+            creditCardToEdit?.internationalEnabled ?: debitCardToEdit?.internationalEnabled ?: false
+        )
+    }
     var selectedMemberId by remember {
         mutableStateOf(creditCardToEdit?.memberId ?: debitCardToEdit?.memberId ?: "")
     }
@@ -172,6 +271,58 @@ fun AddCardDialog(
         mutableLongStateOf(
             creditCardToEdit?.colorHex ?: debitCardToEdit?.colorHex ?: CardColorBlockOptions.first()
         )
+    }
+    var showCustomColorPicker by remember { mutableStateOf(false) }
+
+    var frontCardImagePath by remember {
+        mutableStateOf(creditCardToEdit?.frontCardImagePath ?: debitCardToEdit?.frontCardImagePath)
+    }
+    var backCardImagePath by remember {
+        mutableStateOf(creditCardToEdit?.backCardImagePath ?: debitCardToEdit?.backCardImagePath)
+    }
+    var attachmentPaths by remember {
+        mutableStateOf(creditCardToEdit?.attachmentPaths ?: debitCardToEdit?.attachmentPaths ?: emptyList())
+    }
+    var activePreviewPath by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+
+    val frontPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val path = AttachmentFileManager.copyUriToInternalStorage(context, uri)
+            if (path != null) {
+                frontCardImagePath = path
+                Toast.makeText(context, "Front card image attached", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val backPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val path = AttachmentFileManager.copyUriToInternalStorage(context, uri)
+            if (path != null) {
+                backCardImagePath = path
+                Toast.makeText(context, "Back card image attached", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val extraAttachmentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val savedPaths = uris.mapNotNull { uri ->
+                AttachmentFileManager.copyUriToInternalStorage(context, uri)
+            }
+            if (savedPaths.isNotEmpty()) {
+                attachmentPaths = (attachmentPaths + savedPaths).distinct()
+                Toast.makeText(context, "Added ${savedPaths.size} attachment(s)", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // Error states
@@ -325,43 +476,51 @@ fun AddCardDialog(
                                 color = MaterialTheme.colorScheme.primary
                             )
 
-                            // Quick Bank Chips
-                            Text(
-                                text = "Quick Select Issuer:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(popularBanks) { bank ->
-                                    val isSelected = bankName.equals(bank, ignoreCase = true)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = {
-                                            bankName = bank
-                                            bankNameError = false
-                                            errorMessage = null
-                                        },
-                                        label = { Text(bank, fontSize = 12.sp) }
-                                    )
+                            // Quick Bank Suggestions & Issuer Input
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (rememberedBanks.isNotEmpty()) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(rememberedBanks.take(6)) { bank ->
+                                            val isSelected = bankName.equals(bank, ignoreCase = true)
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    bankName = bank
+                                                    bankNameError = false
+                                                    errorMessage = null
+                                                },
+                                                label = { Text(bank, fontSize = 11.sp) }
+                                            )
+                                        }
+                                    }
                                 }
-                            }
 
-                            // Bank Name TextField
-                            OutlinedTextField(
-                                value = bankName,
-                                onValueChange = {
-                                    bankName = it
-                                    if (it.isNotBlank()) bankNameError = false
-                                },
-                                label = { Text("Bank / Issuer Name *") },
-                                placeholder = { Text("e.g. HDFC Bank, ICICI, SBI, Axis, Amex") },
-                                isError = bankNameError,
-                                supportingText = if (bankNameError) {
-                                    { Text("Bank name is required", color = MaterialTheme.colorScheme.error) }
-                                } else null,
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                                // Bank Name TextField
+                                OutlinedTextField(
+                                    value = bankName,
+                                    onValueChange = {
+                                        bankName = it
+                                        if (it.isNotBlank()) bankNameError = false
+                                    },
+                                    label = { Text("Bank / Issuer Name *") },
+                                    placeholder = { Text("e.g. HDFC Bank, ICICI, SBI, Axis, Amex") },
+                                    leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
+                                    isError = bankNameError,
+                                    supportingText = if (bankNameError) {
+                                        { Text("Bank name is required", color = MaterialTheme.colorScheme.error) }
+                                    } else null,
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
 
                             // Card Name TextField
                             OutlinedTextField(
@@ -369,15 +528,21 @@ fun AddCardDialog(
                                 onValueChange = { cardName = it },
                                 label = { Text("Card Model / Nickname") },
                                 placeholder = { Text("e.g. Tata Neu Infinity, Millennia, Coral, Sapphiro") },
+                                leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = null) },
                                 singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface
+                                ),
                                 modifier = Modifier.fillMaxWidth()
                             )
 
                             // Network Selection (RuPay, Visa, Mastercard, Amex)
                             Text(
-                                text = "Card Network",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "CARD NETWORK",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
                             )
 
                             Row(
@@ -419,7 +584,7 @@ fun AddCardDialog(
                         }
                     }
 
-                    // SECTION 2: Card Credentials (Number, Expiry, CVV, Cardholder)
+                    // SECTION 2: Card Credentials (Number, Expiry, CVV, Cardholder, Linked Contacts)
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
@@ -448,6 +613,7 @@ fun AddCardDialog(
                                 },
                                 label = { Text("Card Number (Auto-grouped in 4s) *") },
                                 placeholder = { Text("4532 8920 1192 3847") },
+                                leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) },
                                 isError = cardNumberError,
                                 supportingText = {
                                     Row(
@@ -463,19 +629,20 @@ fun AddCardDialog(
                                     }
                                 },
                                 singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
                                 visualTransformation = CardNumberVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface
                                 ),
                                 modifier = Modifier.fillMaxWidth()
                             )
 
-                            // Expiry & CVV Row
+                            // Expiry & CVV Row (equal width, clean alignment, no eye icon)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 // Expiry with auto "/" via ExpiryDateVisualTransformation
                                 OutlinedTextField(
@@ -485,14 +652,19 @@ fun AddCardDialog(
                                     },
                                     label = { Text("Expiry (MM/YY) *") },
                                     placeholder = { Text("12/28") },
-                                    supportingText = { Text("Enter MMYY (e.g. 1228)", fontSize = 10.sp) },
+                                    leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                                     singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
                                     visualTransformation = ExpiryDateVisualTransformation(),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1.1f)
+                                    modifier = Modifier.weight(1f)
                                 )
 
-                                // CVV with toggle visibility
+                                // CVV without eye icon, clean aligned box
                                 OutlinedTextField(
                                     value = cvv,
                                     onValueChange = {
@@ -500,70 +672,214 @@ fun AddCardDialog(
                                     },
                                     label = { Text("CVV / CVC") },
                                     placeholder = { Text("3 or 4 digits") },
-                                    supportingText = { Text("Optional for vault", fontSize = 10.sp) },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                                     singleLine = true,
-                                    visualTransformation = if (isCvvVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                    trailingIcon = {
-                                        IconButton(onClick = { isCvvVisible = !isCvvVisible }) {
-                                            Icon(
-                                                imageVector = if (isCvvVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                                contentDescription = "Toggle CVV visibility",
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f)
                                 )
                             }
 
-                            // Cardholder Name
-                            OutlinedTextField(
-                                value = cardholderName,
-                                onValueChange = { cardholderName = it },
-                                label = { Text("Cardholder Name") },
-                                placeholder = { Text("As printed on card") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            // Linked Contact (Email & Phone Number for Bank Alerts/OTP)
+                            // ATM PIN & Card PIN Row (Encrypted / Protected)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 OutlinedTextField(
-                                    value = linkedEmail,
-                                    onValueChange = { linkedEmail = it },
-                                    label = { Text("Linked Email") },
-                                    placeholder = { Text("alerts@bank.com") },
+                                    value = atmPin,
+                                    onValueChange = { atmPin = it.filter { char -> char.isDigit() }.take(6) },
+                                    label = { Text("ATM PIN") },
+                                    placeholder = { Text("4 digits") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                                     singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                                     modifier = Modifier.weight(1f)
                                 )
 
                                 OutlinedTextField(
-                                    value = linkedPhone,
-                                    onValueChange = { linkedPhone = it },
-                                    label = { Text("Linked Phone") },
-                                    placeholder = { Text("+91 9876543210") },
+                                    value = cardPin,
+                                    onValueChange = { cardPin = it.filter { char -> char.isDigit() }.take(6) },
+                                    label = { Text("Card / POS PIN") },
+                                    placeholder = { Text("4-6 digits") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                                     singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                                     modifier = Modifier.weight(1f)
                                 )
+                            }
+
+                            // Cardholder Name with auto-suggestions
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                OutlinedTextField(
+                                    value = cardholderName,
+                                    onValueChange = { cardholderName = it },
+                                    label = { Text("Cardholder Name") },
+                                    placeholder = { Text("As printed on card") },
+                                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                if (rememberedNames.isNotEmpty() && (cardholderName.isBlank() || !rememberedNames.contains(cardholderName))) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(rememberedNames) { name ->
+                                            AssistChip(
+                                                onClick = { cardholderName = name },
+                                                label = { Text(name, fontSize = 11.sp) },
+                                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Linked Contact (Email & Phone Number with suggestions)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = linkedEmail,
+                                        onValueChange = { linkedEmail = it },
+                                        label = { Text("Linked Email") },
+                                        placeholder = { Text("alerts@bank.com") },
+                                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surface
+                                        ),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    OutlinedTextField(
+                                        value = linkedPhone,
+                                        onValueChange = { linkedPhone = it },
+                                        label = { Text("Linked Phone") },
+                                        placeholder = { Text("+91 9876543210") },
+                                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surface
+                                        ),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                if (rememberedEmails.isNotEmpty() && linkedEmail.isBlank()) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(rememberedEmails) { email ->
+                                            AssistChip(
+                                                onClick = { linkedEmail = email },
+                                                label = { Text(email, fontSize = 11.sp) },
+                                                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (rememberedPhones.isNotEmpty() && linkedPhone.isBlank()) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(rememberedPhones) { phone ->
+                                            AssistChip(
+                                                onClick = { linkedPhone = phone },
+                                                label = { Text(phone, fontSize = 11.sp) },
+                                                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                            )
+                                        }
+                                    }
+                                }
+                                 Spacer(modifier = Modifier.height(4.dp))
+
+                                 Row(
+                                     modifier = Modifier.fillMaxWidth(),
+                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                 ) {
+                                     OutlinedTextField(
+                                         value = customerCareNumber,
+                                         onValueChange = { customerCareNumber = it },
+                                         label = { Text("Customer Care No.") },
+                                         placeholder = { Text("1800-XXX-XXXX") },
+                                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                                         singleLine = true,
+                                         shape = RoundedCornerShape(12.dp),
+                                         colors = OutlinedTextFieldDefaults.colors(
+                                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                             focusedContainerColor = MaterialTheme.colorScheme.surface
+                                         ),
+                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                         modifier = Modifier.weight(1f)
+                                     )
+
+                                     OutlinedTextField(
+                                         value = supportEmail,
+                                         onValueChange = { supportEmail = it },
+                                         label = { Text("Support Email") },
+                                         placeholder = { Text("support@bank.com") },
+                                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                                         singleLine = true,
+                                         shape = RoundedCornerShape(12.dp),
+                                         colors = OutlinedTextFieldDefaults.colors(
+                                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                             focusedContainerColor = MaterialTheme.colorScheme.surface
+                                         ),
+                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                         modifier = Modifier.weight(1f)
+                                     )
+                                 }
                             }
 
                             // Issuance Date & Reward Points
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 OutlinedTextField(
                                     value = issuanceDate,
                                     onValueChange = { issuanceDate = it },
                                     label = { Text("Issuance Date") },
                                     placeholder = { Text("e.g. 05/23") },
+                                    leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
                                     singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
 
@@ -574,40 +890,14 @@ fun AddCardDialog(
                                     },
                                     label = { Text("Reward Points") },
                                     placeholder = { Text("0") },
+                                    leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },
                                     singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                                    ),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            // Linked Contact Details: Email & Phone
-                            Text(
-                                text = "LINKED CONTACT INFO (EMAIL & PHONE)",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = linkedEmail,
-                                    onValueChange = { linkedEmail = it },
-                                    label = { Text("Linked Email") },
-                                    placeholder = { Text("alerts@bank.com") },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                OutlinedTextField(
-                                    value = linkedPhone,
-                                    onValueChange = { linkedPhone = it },
-                                    label = { Text("Linked Phone") },
-                                    placeholder = { Text("+91 9876543210") },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -705,6 +995,62 @@ fun AddCardDialog(
                         }
                     }
 
+                    // SECTION: Card Limits & Controls
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "CARD LIMITS & SPEND CONTROLS",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = domesticPosLimitText,
+                                    onValueChange = { domesticPosLimitText = it.filter { ch -> ch.isDigit() } },
+                                    label = { Text("Daily POS Limit (₹)") },
+                                    placeholder = { Text("e.g. 50000") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                OutlinedTextField(
+                                    value = dailyAtmLimitText,
+                                    onValueChange = { dailyAtmLimitText = it.filter { ch -> ch.isDigit() } },
+                                    label = { Text("Daily ATM Limit (₹)") },
+                                    placeholder = { Text("e.g. 25000") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("International Usage", style = MaterialTheme.typography.bodyMedium)
+                                    Text("Set on if enabled for global purchases", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Switch(checked = internationalUsage, onCheckedChange = { internationalUsage = it })
+                            }
+                        }
+                    }
+
                     // SECTION 5: Solid Color Block (Google Wallet Style)
                     Card(
                         shape = RoundedCornerShape(16.dp),
@@ -717,7 +1063,7 @@ fun AddCardDialog(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "CARD SOLID COLOR BLOCK (GOOGLE WALLET STYLE)",
+                                text = "Select Color Accent",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -726,6 +1072,30 @@ fun AddCardDialog(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
+                                item {
+                                    val isCustomSelected = !CardColorBlockOptions.contains(selectedColor)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isCustomSelected) Color(selectedColor) else MaterialTheme.colorScheme.surfaceVariant)
+                                            .border(
+                                                width = if (isCustomSelected) 3.dp else 1.dp,
+                                                color = if (isCustomSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
+                                                shape = RoundedCornerShape(10.dp)
+                                            )
+                                            .clickable { showCustomColorPicker = true },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ColorLens,
+                                            contentDescription = "Custom Accent Color",
+                                            tint = if (isCustomSelected) Color.White else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
                                 items(CardColorBlockOptions) { colorValue ->
                                     Box(
                                         modifier = Modifier
@@ -815,6 +1185,166 @@ fun AddCardDialog(
                                             }
                                         }
                                     )
+                                }
+                            }
+                        }
+                    }
+
+                    // SECTION 7: Multi-Attachments & Physical Card Scans
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "ATTACHMENTS & CARD SCANS",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Attach Front/Back photos & PDF statements",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // Quick Action Buttons: Front Image, Back Image, Extra Files/PDF
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        frontPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(40.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = if (frontCardImagePath != null) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)) else ButtonDefaults.outlinedButtonColors()
+                                ) {
+                                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (frontCardImagePath != null) "Front ✓" else "Front", fontSize = 11.sp, maxLines = 1)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        backPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(40.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = if (backCardImagePath != null) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)) else ButtonDefaults.outlinedButtonColors()
+                                ) {
+                                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (backCardImagePath != null) "Back ✓" else "Back", fontSize = 11.sp, maxLines = 1)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        extraAttachmentLauncher.launch(arrayOf("image/*", "application/pdf"))
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(40.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("+ Files", fontSize = 11.sp, maxLines = 1)
+                                }
+                            }
+
+                            // Thumbnails Preview Row
+                            val allAttached = listOfNotNull(
+                                frontCardImagePath?.let { Pair("Front", it) },
+                                backCardImagePath?.let { Pair("Back", it) }
+                            ) + attachmentPaths.map { Pair("Doc", it) }
+
+                            if (allAttached.isNotEmpty()) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(allAttached) { (tag, path) ->
+                                        val file = AttachmentFileManager.getFile(context, path)
+                                        val isPdf = AttachmentFileManager.isPdf(file)
+
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant,
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                            modifier = Modifier
+                                                .size(72.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable { activePreviewPath = path }
+                                        ) {
+                                            Box(modifier = Modifier.fillMaxSize()) {
+                                                if (isPdf) {
+                                                    Column(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        verticalArrangement = Arrangement.Center
+                                                    ) {
+                                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(24.dp))
+                                                        Text("PDF", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                } else {
+                                                    AsyncImage(
+                                                        model = file,
+                                                        contentDescription = tag,
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
+                                                }
+
+                                                // Tag badge
+                                                Surface(
+                                                    color = Color.Black.copy(alpha = 0.6f),
+                                                    shape = RoundedCornerShape(bottomEnd = 6.dp),
+                                                    modifier = Modifier.align(Alignment.TopStart)
+                                                ) {
+                                                    Text(tag, color = Color.White, fontSize = 8.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), fontWeight = FontWeight.Bold)
+                                                }
+
+                                                // Remove Button
+                                                IconButton(
+                                                    onClick = {
+                                                        if (path == frontCardImagePath) frontCardImagePath = null
+                                                        else if (path == backCardImagePath) backCardImagePath = null
+                                                        else attachmentPaths = attachmentPaths.filter { it != path }
+                                                    },
+                                                    modifier = Modifier
+                                                        .size(22.dp)
+                                                        .align(Alignment.TopEnd)
+                                                ) {
+                                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(14.dp))
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -928,13 +1458,22 @@ fun AddCardDialog(
                                         ccRewardPoints = points,
                                         statementDate = statementDate.trim(),
                                         dueDate = dueDate.trim(),
+                                        isBillPaid = isBillPaid,
+                                        domesticPosLimit = domesticPosLimitText.toLongOrNull() ?: 0L,
+                                        atmDailyLimit = dailyAtmLimitText.toLongOrNull() ?: 0L,
+                                        internationalEnabled = internationalUsage,
+                                        atmPin = atmPin.trim(),
+                                        cardPin = cardPin.trim(),
                                         remindExpiry = remindExpiry,
                                         remindBillDate = remindBillDate,
                                         remindDueDate = remindDueDate,
                                         memberId = selectedMemberId,
                                         colorHex = selectedColor,
                                         linkedEmail = linkedEmail.trim(),
-                                        linkedPhone = linkedPhone.trim()
+                                        linkedPhone = linkedPhone.trim(),
+                                        frontCardImagePath = frontCardImagePath,
+                                        backCardImagePath = backCardImagePath,
+                                        attachmentPaths = attachmentPaths
                                     )
                                     onSaveCreditCard(card)
                                 } else {
@@ -949,11 +1488,19 @@ fun AddCardDialog(
                                         cardholderName = finalHolderName,
                                         issuanceDate = issuanceDate.trim(),
                                         rewardPoints = points,
+                                        domesticPosLimit = domesticPosLimitText.toLongOrNull() ?: 0L,
+                                        atmDailyLimit = dailyAtmLimitText.toLongOrNull() ?: 0L,
+                                        internationalEnabled = internationalUsage,
+                                        atmPin = atmPin.trim(),
+                                        cardPin = cardPin.trim(),
                                         remindExpiry = remindExpiry,
                                         memberId = selectedMemberId,
                                         colorHex = selectedColor,
                                         linkedEmail = linkedEmail.trim(),
-                                        linkedPhone = linkedPhone.trim()
+                                        linkedPhone = linkedPhone.trim(),
+                                        frontCardImagePath = frontCardImagePath,
+                                        backCardImagePath = backCardImagePath,
+                                        attachmentPaths = attachmentPaths
                                     )
                                     onSaveDebitCard(card)
                                 }
@@ -979,6 +1526,25 @@ fun AddCardDialog(
                 }
             }
         }
+    }
+
+    if (activePreviewPath != null) {
+        AttachmentViewerSheet(
+            attachmentPath = activePreviewPath,
+            documentTitle = "Card Attachment Viewer",
+            onDismiss = { activePreviewPath = null }
+        )
+    }
+
+    if (showCustomColorPicker) {
+        CustomColorPickerDialog(
+            initialColorHex = String.format("#%06X", 0xFFFFFF and selectedColor.toInt()),
+            title = "Custom Card Color Accent",
+            onColorSelected = { colorLong, _ ->
+                selectedColor = colorLong
+            },
+            onDismiss = { showCustomColorPicker = false }
+        )
     }
 }
 
@@ -1019,22 +1585,26 @@ private fun LiveCardPreview(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                         Text(
-                            text = bankName.uppercase(),
+                            text = bankName.ifBlank { "BANK NAME" }.uppercase(),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 1.sp
                             ),
                             color = Color.White,
-                            maxLines = 1
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee()
                         )
-                        Text(
-                            text = cardName,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                            color = Color.White.copy(alpha = 0.85f),
-                            maxLines = 1
-                        )
+                        if (cardName.isNotBlank()) {
+                            Text(
+                                text = cardName,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = Color.White.copy(alpha = 0.85f),
+                                maxLines = 1,
+                                modifier = Modifier.basicMarquee()
+                            )
+                        }
                     }
 
                     Row(
@@ -1084,20 +1654,21 @@ private fun LiveCardPreview(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)) {
                         Text(
                             text = "CARDHOLDER",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.sp),
                             color = Color.White.copy(alpha = 0.65f)
                         )
                         Text(
-                            text = cardholderName.uppercase(),
+                            text = cardholderName.ifBlank { "YOUR NAME" }.uppercase(),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
                             ),
                             color = Color.White,
-                            maxLines = 1
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee()
                         )
                     }
 

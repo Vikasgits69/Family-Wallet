@@ -163,15 +163,184 @@ private val HighContrastColorScheme = darkColorScheme(
     outlineVariant = Color(0xFFB3B3B3)
 )
 
+private val EmeraldVaultColorScheme = darkColorScheme(
+    primary = Color(0xFF10B981),
+    onPrimary = Color(0xFF022C22),
+    primaryContainer = Color(0xFF064E3B),
+    onPrimaryContainer = Color(0xFF6EE7B7),
+    secondary = Color(0xFFF59E0B),
+    onSecondary = Color(0xFF451A03),
+    secondaryContainer = Color(0xFF78350F),
+    onSecondaryContainer = Color(0xFFFDE68A),
+    tertiary = Color(0xFF34D399),
+    onTertiary = Color(0xFF022C22),
+    background = Color(0xFF041712),
+    onBackground = Color(0xFFECFDF5),
+    surface = Color(0xFF08271E),
+    onSurface = Color(0xFFECFDF5),
+    surfaceVariant = Color(0xFF0F3E31),
+    onSurfaceVariant = Color(0xFFA7F3D0),
+    outline = Color(0x5510B981),
+    outlineVariant = Color(0x2210B981)
+)
+
+private val MidnightRoseColorScheme = darkColorScheme(
+    primary = Color(0xFFF43F5E),
+    onPrimary = Color(0xFF4C0519),
+    primaryContainer = Color(0xFF881337),
+    onPrimaryContainer = Color(0xFFFFD1DC),
+    secondary = Color(0xFFA855F7),
+    onSecondary = Color(0xFF3B0764),
+    secondaryContainer = Color(0xFF581C87),
+    onSecondaryContainer = Color(0xFFF3E8FF),
+    tertiary = Color(0xFFFB7185),
+    onTertiary = Color(0xFF4C0519),
+    background = Color(0xFF0F0713),
+    onBackground = Color(0xFFFFF1F2),
+    surface = Color(0xFF190D20),
+    onSurface = Color(0xFFFFF1F2),
+    surfaceVariant = Color(0xFF2B1437),
+    onSurfaceVariant = Color(0xFFFBCFE8),
+    outline = Color(0x55F43F5E),
+    outlineVariant = Color(0x22F43F5E)
+)
+
+private val PlatinumLuxuryColorScheme = darkColorScheme(
+    primary = Color(0xFFCBD5E1),
+    onPrimary = Color(0xFF0F172A),
+    primaryContainer = Color(0xFF334155),
+    onPrimaryContainer = Color(0xFFF8FAFC),
+    secondary = Color(0xFF94A3B8),
+    onSecondary = Color(0xFF0F172A),
+    secondaryContainer = Color(0xFF1E293B),
+    onSecondaryContainer = Color(0xFFE2E8F0),
+    tertiary = Color(0xFFE2E8F0),
+    onTertiary = Color(0xFF0F172A),
+    background = Color(0xFF0B0D10),
+    onBackground = Color(0xFFF8FAFC),
+    surface = Color(0xFF14171C),
+    onSurface = Color(0xFFF8FAFC),
+    surfaceVariant = Color(0xFF20252D),
+    onSurfaceVariant = Color(0xFF94A3B8),
+    outline = Color(0x6664748B),
+    outlineVariant = Color(0x2294A3B8)
+)
+
+private val CyberNeonColorScheme = darkColorScheme(
+    primary = Color(0xFF00F5FF),
+    onPrimary = Color(0xFF00363A),
+    primaryContainer = Color(0xFF004D40),
+    onPrimaryContainer = Color(0xFF80DEEA),
+    secondary = Color(0xFFD946EF),
+    onSecondary = Color(0xFF4A044E),
+    secondaryContainer = Color(0xFF701A75),
+    onSecondaryContainer = Color(0xFFF5D0FE),
+    tertiary = Color(0xFF38BDF8),
+    onTertiary = Color(0xFF002244),
+    background = Color(0xFF060814),
+    onBackground = Color(0xFFE0F7FA),
+    surface = Color(0xFF0B0F24),
+    onSurface = Color(0xFFE0F7FA),
+    surfaceVariant = Color(0xFF131A3E),
+    onSurfaceVariant = Color(0xFF80DEEA),
+    outline = Color(0x7700F5FF),
+    outlineVariant = Color(0x33D946EF)
+)
+
+private val NordicFrostColorScheme = lightColorScheme(
+    primary = Color(0xFF0284C7),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFE0F2FE),
+    onPrimaryContainer = Color(0xFF0369A1),
+    secondary = Color(0xFF0EA5E9),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFBAE6FD),
+    onSecondaryContainer = Color(0xFF075985),
+    tertiary = Color(0xFF64748B),
+    onTertiary = Color.White,
+    background = Color(0xFFF0F4F8),
+    onBackground = Color(0xFF0F172A),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFE2E8F0),
+    onSurfaceVariant = Color(0xFF334155),
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0)
+)
+
+private val SunsetAmberColorScheme = lightColorScheme(
+    primary = Color(0xFFEA580C),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFEDD5),
+    onPrimaryContainer = Color(0xFF9A3412),
+    secondary = Color(0xFFD97706),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFEF3C7),
+    onSecondaryContainer = Color(0xFF78350F),
+    tertiary = Color(0xFFB45309),
+    onTertiary = Color.White,
+    background = Color(0xFFFAF5EE),
+    onBackground = Color(0xFF292524),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF292524),
+    surfaceVariant = Color(0xFFF5EBE1),
+    onSurfaceVariant = Color(0xFF57534E),
+    outline = Color(0xFFE7DFD5),
+    outlineVariant = Color(0xFFF0EAE1)
+)
+
+private val MatchaSageColorScheme = lightColorScheme(
+    primary = Color(0xFF4D7C0F),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFECFCCB),
+    onPrimaryContainer = Color(0xFF365314),
+    secondary = Color(0xFF65A30D),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFD9F99D),
+    onSecondaryContainer = Color(0xFF1A2E05),
+    tertiary = Color(0xFF3F6212),
+    onTertiary = Color.White,
+    background = Color(0xFFF7F8F2),
+    onBackground = Color(0xFF1C1D18),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF1C1D18),
+    surfaceVariant = Color(0xFFEBF0E1),
+    onSurfaceVariant = Color(0xFF4B553D),
+    outline = Color(0xFFDDE5D3),
+    outlineVariant = Color(0xFFE5EDE0)
+)
+
+fun parseHexColor(hexString: String?): Color? {
+    if (hexString.isNullOrBlank()) return null
+    return try {
+        val clean = hexString.trim().removePrefix("#")
+        val colorLong = when (clean.length) {
+            6 -> ("FF" + clean).toLong(16)
+            8 -> clean.toLong(16)
+            3 -> {
+                val r = clean[0]
+                val g = clean[1]
+                val b = clean[2]
+                ("FF$r$r$g$g$b$b").toLong(16)
+            }
+            else -> return null
+        }
+        Color(colorLong)
+    } catch (e: Exception) {
+        null
+    }
+}
+
 @Composable
 fun FamilyWalletTheme(
     themeMode: AppThemeMode = AppThemeMode.DARK,
     darkTheme: Boolean = true,
     dynamicColor: Boolean = false,
+    customAccentHex: String? = null,
     content: @Composable () -> Unit
 ) {
     val systemInDark = isSystemInDarkTheme()
-    val targetColorScheme = when (themeMode) {
+    val baseColorScheme = when (themeMode) {
         AppThemeMode.DOODLE -> DoodleColorScheme
         AppThemeMode.DOODLE_DARK -> DoodleDarkColorScheme
         AppThemeMode.LIGHT -> LightColorScheme
@@ -179,7 +348,31 @@ fun FamilyWalletTheme(
         AppThemeMode.PITCH_BLACK -> PitchBlackColorScheme
         AppThemeMode.HIGH_CONTRAST -> HighContrastColorScheme
         AppThemeMode.PAPERLIKE -> PaperlikeColorScheme
-        AppThemeMode.SYSTEM -> if (systemInDark) DoodleDarkColorScheme else DoodleColorScheme
+        AppThemeMode.EMERALD_VAULT -> EmeraldVaultColorScheme
+        AppThemeMode.MIDNIGHT_ROSE -> MidnightRoseColorScheme
+        AppThemeMode.PLATINUM_LUXURY -> PlatinumLuxuryColorScheme
+        AppThemeMode.CYBER_NEON -> CyberNeonColorScheme
+        AppThemeMode.NORDIC_FROST -> NordicFrostColorScheme
+        AppThemeMode.SUNSET_AMBER -> SunsetAmberColorScheme
+        AppThemeMode.MATCHA_SAGE -> MatchaSageColorScheme
+        AppThemeMode.SYSTEM -> if (systemInDark) DarkColorScheme else LightColorScheme
+    }
+
+    val customAccentColor = parseHexColor(customAccentHex)
+    val targetColorScheme = if (customAccentColor != null) {
+        val lum = customAccentColor.red * 0.299f + customAccentColor.green * 0.587f + customAccentColor.blue * 0.114f
+        val onPrimaryColor = if (lum > 0.65f) Color.Black else Color.White
+        val isDark = baseColorScheme.background.red * 0.299f + baseColorScheme.background.green * 0.587f + baseColorScheme.background.blue * 0.114f < 0.5f
+        val container = if (isDark) customAccentColor.copy(alpha = 0.25f) else customAccentColor.copy(alpha = 0.15f)
+        val onContainer = if (isDark) Color.White else customAccentColor
+        baseColorScheme.copy(
+            primary = customAccentColor,
+            onPrimary = onPrimaryColor,
+            primaryContainer = container,
+            onPrimaryContainer = onContainer
+        )
+    } else {
+        baseColorScheme
     }
 
     // Smooth color transitions when theme is switched

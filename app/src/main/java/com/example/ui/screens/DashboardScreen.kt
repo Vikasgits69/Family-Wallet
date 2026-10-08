@@ -25,6 +25,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CreditCard
@@ -87,6 +91,9 @@ fun DashboardScreen(
     onOpenAddAccount: () -> Unit,
     onOpenAddWallet: () -> Unit,
     onOpenAddMember: () -> Unit,
+    onOpenEmergencyIce: () -> Unit = {},
+    onOpenSecurityCheckup: () -> Unit = {},
+    onOpenHelplines: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Immediate rendering with zero delay for snappy border and card loading
@@ -107,6 +114,86 @@ fun DashboardScreen(
                     uiState = uiState,
                     onNavigateTab = onNavigateTab
                 )
+            }
+        }
+
+        // Quick Action Bar for Emergency, Security, Helplines & Subscriptions
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    onClick = { onOpenEmergencyIce() },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE11D48).copy(alpha = 0.12f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE11D48).copy(alpha = 0.35f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Favorite, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("ICE Vault", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFFE11D48))
+                    }
+                }
+
+                Surface(
+                    onClick = { onOpenSecurityCheckup() },
+                    shape = RoundedCornerShape(12.dp),
+                    color = IndigoAccent.copy(alpha = 0.12f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, IndigoAccent.copy(alpha = 0.35f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = IndigoAccent, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Audit", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = IndigoAccent)
+                    }
+                }
+
+                Surface(
+                    onClick = { onOpenHelplines() },
+                    shape = RoundedCornerShape(12.dp),
+                    color = EmeraldMint.copy(alpha = 0.12f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldMint.copy(alpha = 0.35f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Phone, contentDescription = null, tint = EmeraldMint, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Helpline", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = EmeraldMint)
+                    }
+                }
+
+                Surface(
+                    onClick = { onNavigateTab(NavigationTab.WALLETS) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = AmberGold.copy(alpha = 0.12f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AmberGold.copy(alpha = 0.35f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Subscriptions, contentDescription = null, tint = AmberGold, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("${uiState.subscriptions.size} Subs", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = AmberGold)
+                    }
+                }
             }
         }
 
@@ -180,9 +267,9 @@ private fun VaultOverviewWithChartCard(
                 }
 
                 Surface(
+                    onClick = { onNavigateTab(NavigationTab.MEMBERS) },
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.clickable { onNavigateTab(NavigationTab.MEMBERS) }
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -232,6 +319,13 @@ private fun VaultOverviewWithChartCard(
                         onClick = { onNavigateTab(NavigationTab.ACCOUNTS) }
                     )
                     OverviewStatRow(
+                        label = "Personal Docs",
+                        count = uiState.filteredPersonalDocuments.size,
+                        color = Color(0xFF0284C7),
+                        icon = Icons.Default.CreditCard,
+                        onClick = { onNavigateTab(NavigationTab.MEMBERS) }
+                    )
+                    OverviewStatRow(
                         label = "Wallets & Gifts",
                         count = uiState.filteredWalletsAndGiftCards.size,
                         color = AmberGold,
@@ -250,6 +344,7 @@ private fun VaultOverviewWithChartCard(
                         creditCount = uiState.filteredCreditCards.size,
                         debitCount = uiState.filteredDebitCards.size,
                         bankCount = uiState.filteredBankAccounts.size,
+                        personalDocCount = uiState.filteredPersonalDocuments.size,
                         walletGiftCount = uiState.filteredWalletsAndGiftCards.size,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -281,11 +376,10 @@ private fun OverviewStatRow(
     onClick: () -> Unit
 ) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -325,10 +419,11 @@ private fun VaultDonutChart(
     creditCount: Int,
     debitCount: Int,
     bankCount: Int,
+    personalDocCount: Int,
     walletGiftCount: Int,
     modifier: Modifier = Modifier
 ) {
-    val total = creditCount + debitCount + bankCount + walletGiftCount
+    val total = creditCount + debitCount + bankCount + personalDocCount + walletGiftCount
 
     Canvas(modifier = modifier) {
         val strokeWidth = 18.dp.toPx()
@@ -355,6 +450,7 @@ private fun VaultDonutChart(
             Pair(creditCount, IndigoAccent),
             Pair(debitCount, EmeraldMint),
             Pair(bankCount, CyanAccent),
+            Pair(personalDocCount, Color(0xFF0284C7)),
             Pair(walletGiftCount, AmberGold)
         )
 
@@ -464,11 +560,10 @@ private fun UpcomingActionCard(
                 }
             } else {
                 Surface(
+                    onClick = onAddCard,
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onAddCard)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -506,12 +601,11 @@ private fun UpcomingAlertItem(
     onClick: () -> Unit
 ) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
@@ -649,10 +743,11 @@ private fun VaultActionButton(
     onClick: () -> Unit
 ) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier,
         shadowElevation = 1.dp
     ) {
         Column(

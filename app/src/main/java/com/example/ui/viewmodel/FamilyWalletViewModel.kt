@@ -10,15 +10,25 @@ import com.example.data.CardStatus
 import com.example.data.CreditCard
 import com.example.data.DebitCard
 import com.example.data.DisplayMode
+import com.example.data.Document
 import com.example.data.FamilyMember
 import com.example.data.NavigationTab
+import com.example.data.PersonalDocument
 import com.example.data.WalletOrGiftCard
 import com.example.data.local.AppDatabase
+import com.example.data.local.BankAccountEntity
+import com.example.data.local.CreditCardEntity
+import com.example.data.local.DebitCardEntity
+import com.example.data.local.DocumentEntity
+import com.example.data.local.FamilyMemberEntity
 import com.example.data.local.VaultRepository
+import com.example.data.local.WalletOrGiftCardEntity
 import com.example.data.toDomain
 import com.example.data.toEntity
+import com.example.sync.DriveBackupRepository
 import com.example.sync.DriveSyncState
 import com.example.sync.GoogleDriveBackupManager
+import com.example.sync.DriveBackupFileInfo
 import com.example.util.VaultPreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +37,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
+
+import com.example.data.Subscription
+import com.example.data.local.SubscriptionEntity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class UpcomingCardAlert(
     val cardId: String,
@@ -43,7 +59,6 @@ data class UpcomingCardAlert(
 data class FamilyWalletUiState(
     val members: List<FamilyMember> = emptyList(),
     val selectedMemberId: String? = null,
-    val displayMode: DisplayMode = DisplayMode.LIST,
     val currentTab: NavigationTab = NavigationTab.DASHBOARD,
     val isMaskedGlobally: Boolean = true,
     val unmaskedItemIds: Set<String> = emptySet(),
@@ -55,6 +70,8 @@ data class FamilyWalletUiState(
     val debitCards: List<DebitCard> = emptyList(),
     val walletsAndGiftCards: List<WalletOrGiftCard> = emptyList(),
     val bankAccounts: List<BankAccount> = emptyList(),
+    val documents: List<Document> = emptyList(),
+    val subscriptions: List<Subscription> = emptyList(),
     val searchQuery: String = "",
     val networkFilter: CardNetwork? = null,
     val showAddCreditCardDialog: Boolean = false,
@@ -62,19 +79,56 @@ data class FamilyWalletUiState(
     val showAddAccountDialog: Boolean = false,
     val showAddWalletDialog: Boolean = false,
     val showAddMemberDialog: Boolean = false,
+    val showAddDocumentDialog: Boolean = false,
+    val showAddSubscriptionDialog: Boolean = false,
     val editingCreditCard: CreditCard? = null,
     val editingDebitCard: DebitCard? = null,
     val editingBankAccount: BankAccount? = null,
     val editingWalletOrGiftCard: WalletOrGiftCard? = null,
     val editingMember: FamilyMember? = null,
+    val editingPersonalDocument: Document? = null,
+    val editingSubscription: Subscription? = null,
+    val showEmergencyIceDialog: Boolean = false,
+    val showSecurityCheckupDialog: Boolean = false,
+    val showHelplineDialog: Boolean = false,
+    val helplineTargetBank: String = "",
+    val activeUpiQrData: Pair<String, String>? = null,
+    val spendingGiftCard: WalletOrGiftCard? = null,
     val notificationMessage: String? = null,
-    val isAppLocked: Boolean = false,
+    val isAppLocked: Boolean = true,
     val biometricStatusMessage: String? = null,
     val biometricEnabled: Boolean = true,
-    val driveSync: DriveSyncState = DriveSyncState()
+    val driveSync: DriveSyncState = DriveSyncState(),
+    val autoBackupFrequency: String = "Daily", // "Manual", "Daily", "Weekly"
+    val autoBackupOnOpen: Boolean = true,
+    val autoBackupOnClose: Boolean = true,
+    val includePhotosInBackup: Boolean = true,
+    val availableDriveBackups: List<DriveBackupFileInfo> = emptyList(),
+    val customAccentColorHex: String? = null,
+    val clipboardAutoClearEnabled: Boolean = true,
+    val clipboardClearTimeoutSeconds: Int = 30,
+    val sectionDisplayModes: Map<NavigationTab, DisplayMode> = mapOf(
+        NavigationTab.DASHBOARD to DisplayMode.LIST,
+        NavigationTab.CARDS to DisplayMode.LIST,
+        NavigationTab.ACCOUNTS to DisplayMode.LIST,
+        NavigationTab.WALLETS to DisplayMode.LIST,
+        NavigationTab.DOCUMENTS to DisplayMode.LIST,
+        NavigationTab.MEMBERS to DisplayMode.LIST,
+        NavigationTab.SETTINGS to DisplayMode.LIST
+    )
 ) {
+    val displayMode: DisplayMode
+        get() = sectionDisplayModes[currentTab] ?: DisplayMode.LIST
+
+    fun getDisplayModeForTab(tab: NavigationTab): DisplayMode =
+        sectionDisplayModes[tab] ?: DisplayMode.LIST
+
     val selectedMember: FamilyMember?
         get() = members.find { it.id == selectedMemberId }
+
+    // Backward compatibility property
+    val personalDocuments: List<Document>
+        get() = documents
 
     // Global Search across ALL tables
     val filteredMembers: List<FamilyMember>
@@ -118,6 +172,7 @@ data class FamilyWalletUiState(
                         it.accountHolderName.contains(searchQuery, ignoreCase = true) ||
                         it.ifscCode.contains(searchQuery, ignoreCase = true) ||
                         it.micrCode.contains(searchQuery, ignoreCase = true) ||
+                        (it.cifOrClientCode?.contains(searchQuery, ignoreCase = true) == true) ||
                         it.accountNumber.takeLast(4).contains(searchQuery)
             }
 
@@ -130,6 +185,30 @@ data class FamilyWalletUiState(
                         it.cardNumberOrUpi.contains(searchQuery, ignoreCase = true) ||
                         it.remarks.contains(searchQuery, ignoreCase = true) ||
                         it.modeOfRedemption.contains(searchQuery, ignoreCase = true)
+            }
+
+    val filteredDocuments: List<Document>
+        get() = documents
+            .filter { selectedMemberId == null || it.memberId == selectedMemberId }
+            .filter {
+                searchQuery.isBlank() ||
+                        it.displayTitle.contains(searchQuery, ignoreCase = true) ||
+                        it.docNumber.contains(searchQuery, ignoreCase = true) ||
+                        it.notes?.contains(searchQuery, ignoreCase = true) == true
+            }
+
+    val filteredPersonalDocuments: List<Document>
+        get() = filteredDocuments
+
+    val filteredSubscriptions: List<Subscription>
+        get() = subscriptions
+            .filter { selectedMemberId == null || it.memberId == selectedMemberId }
+            .filter {
+                searchQuery.isBlank() ||
+                        it.name.contains(searchQuery, ignoreCase = true) ||
+                        it.planName.contains(searchQuery, ignoreCase = true) ||
+                        it.linkedPaymentMethod.contains(searchQuery, ignoreCase = true) ||
+                        it.notes.contains(searchQuery, ignoreCase = true)
             }
 
     // Informational Vault Counts
@@ -148,69 +227,112 @@ data class FamilyWalletUiState(
     val totalGiftCardsCount: Int
         get() = filteredWalletsAndGiftCards.count { it.isGiftCard }
 
+    val totalDocumentsCount: Int
+        get() = filteredDocuments.size
+
+    val totalPersonalDocumentsCount: Int
+        get() = totalDocumentsCount
+
     val totalVaultAssetsCount: Int
-        get() = filteredCreditCards.size + filteredDebitCards.size + filteredBankAccounts.size + filteredWalletsAndGiftCards.size
+        get() = filteredCreditCards.size + filteredDebitCards.size + filteredBankAccounts.size + filteredWalletsAndGiftCards.size + filteredDocuments.size
 
-    // Upcoming Action Card Items: Bill Dates & Payment Due Dates with explicit Member Name
-    val upcomingAlerts: List<UpcomingCardAlert>
-        get() = creditCards.filter { it.remindBillDate || it.remindDueDate }.mapNotNull { card ->
-            val member = members.find { it.id == card.memberId }
-            val memberName = member?.name ?: "Vault Unassigned"
-            if (card.dueDate.isNotBlank()) {
-                UpcomingCardAlert(
-                    cardId = card.id,
-                    bankName = card.bankName,
-                    cardName = card.cardName,
-                    statementDate = card.statementDate,
-                    dueDate = card.dueDate,
-                    memberId = card.memberId,
-                    memberName = memberName,
-                    colorHex = card.colorHex,
-                    isDueDate = true
-                )
-            } else if (card.statementDate.isNotBlank()) {
-                UpcomingCardAlert(
-                    cardId = card.id,
-                    bankName = card.bankName,
-                    cardName = card.cardName,
-                    statementDate = card.statementDate,
-                    dueDate = card.dueDate,
-                    memberId = card.memberId,
-                    memberName = memberName,
-                    colorHex = card.colorHex,
-                    isDueDate = false
-                )
-            } else null
+    // Dynamic Masking Logic:
+    // Masked if globally masked AND NOT individually toggled to unmasked
+    fun isItemUnmasked(itemId: String): Boolean {
+        return if (isMaskedGlobally) {
+            unmaskedItemIds.contains(itemId)
+        } else {
+            !unmaskedItemIds.contains(itemId)
         }
-
-    fun isItemUnmasked(id: String): Boolean {
-        return !isMaskedGlobally || unmaskedItemIds.contains(id)
     }
 
-    fun isCardFlipped(id: String): Boolean {
-        return flippedCardIds.contains(id)
-    }
+    fun isCardFlipped(cardId: String): Boolean = flippedCardIds.contains(cardId)
+
+    // Bill & Due Date Notifications for the next 7 days
+    val upcomingAlerts: List<UpcomingCardAlert>
+        get() {
+            val alerts = mutableListOf<UpcomingCardAlert>()
+            creditCards.forEach { card ->
+                val member = members.find { it.id == card.memberId }
+                val memberName = member?.name ?: "Personal"
+                if (card.statementDate.isNotBlank() && card.remindBillDate) {
+                    alerts.add(
+                        UpcomingCardAlert(
+                            cardId = card.id,
+                            bankName = card.bankName,
+                            cardName = card.cardName,
+                            statementDate = card.statementDate,
+                            dueDate = card.dueDate,
+                            memberId = card.memberId,
+                            memberName = memberName,
+                            colorHex = card.colorHex,
+                            isDueDate = false
+                        )
+                    )
+                }
+                if (card.dueDate.isNotBlank() && card.remindDueDate) {
+                    alerts.add(
+                        UpcomingCardAlert(
+                            cardId = card.id,
+                            bankName = card.bankName,
+                            cardName = card.cardName,
+                            statementDate = card.statementDate,
+                            dueDate = card.dueDate,
+                            memberId = card.memberId,
+                            memberName = memberName,
+                            colorHex = card.colorHex,
+                            isDueDate = true
+                        )
+                    )
+                }
+            }
+            return alerts
+        }
 }
 
 class FamilyWalletViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Room Database & Repository
-    private val database = AppDatabase.getDatabase(application)
-    private val repository = VaultRepository(database.familyWalletDao())
+    private val repository: VaultRepository
+    private val preferencesManager = VaultPreferencesManager(application)
 
-    private val _uiState = MutableStateFlow(
-        FamilyWalletUiState(
-            themeMode = VaultPreferencesManager.loadThemeMode(application),
-            isDarkTheme = (VaultPreferencesManager.loadThemeMode(application) != AppThemeMode.LIGHT && VaultPreferencesManager.loadThemeMode(application) != AppThemeMode.DOODLE && VaultPreferencesManager.loadThemeMode(application) != AppThemeMode.PAPERLIKE),
-            biometricEnabled = VaultPreferencesManager.loadBiometricEnabled(application),
-            isAppLocked = VaultPreferencesManager.loadBiometricEnabled(application),
-            isMaskedGlobally = VaultPreferencesManager.loadGlobalMask(application),
-            masterPin = VaultPreferencesManager.loadMasterPin(application)
-        )
-    )
+    private val _uiState = MutableStateFlow(FamilyWalletUiState())
     val uiState: StateFlow<FamilyWalletUiState> = _uiState.asStateFlow()
 
     init {
+        val database = AppDatabase.getDatabase(application)
+        repository = VaultRepository(database.familyWalletDao())
+
+        // Load saved preferences (Master PIN, Dark Theme, Theme Mode, Biometric, Custom Accent, Section View Modes)
+        val savedThemeMode = preferencesManager.getThemeMode()
+        val savedTheme = preferencesManager.isDarkTheme()
+        val savedCustomAccent = preferencesManager.getCustomAccentColor()
+        val savedPin = preferencesManager.getMasterPin()
+        val savedBiometric = preferencesManager.isBiometricEnabled()
+        val savedSectionModes = preferencesManager.getAllSectionDisplayModes()
+        val savedAutoFrequency = preferencesManager.getAutoBackupFrequency()
+        val savedAutoOpen = preferencesManager.isAutoBackupOnOpen()
+        val savedAutoClose = preferencesManager.isAutoBackupOnClose()
+        val savedIncludePhotos = preferencesManager.isIncludePhotosInBackup()
+        val savedClipboardAutoClear = preferencesManager.isClipboardAutoClearEnabled()
+        val savedClipboardTimeout = preferencesManager.getClipboardClearTimeout()
+
+        _uiState.update {
+            it.copy(
+                isDarkTheme = savedTheme,
+                themeMode = savedThemeMode,
+                customAccentColorHex = savedCustomAccent,
+                masterPin = savedPin,
+                biometricEnabled = savedBiometric,
+                sectionDisplayModes = savedSectionModes,
+                autoBackupFrequency = savedAutoFrequency,
+                autoBackupOnOpen = savedAutoOpen,
+                autoBackupOnClose = savedAutoClose,
+                includePhotosInBackup = savedIncludePhotos,
+                clipboardAutoClearEnabled = savedClipboardAutoClear,
+                clipboardClearTimeoutSeconds = savedClipboardTimeout
+            )
+        }
+
         // Collect reactive flows from Room repository into UI State
         viewModelScope.launch {
             combine(
@@ -218,15 +340,34 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
                 repository.allCreditCards,
                 repository.allDebitCards,
                 repository.allBankAccounts,
-                repository.allWalletsAndGiftCards
-            ) { members, creditCards, debitCards, bankAccounts, walletsAndGifts ->
+                repository.allWalletsAndGiftCards,
+                repository.allDocuments,
+                repository.allSubscriptions
+            ) { array ->
+                @Suppress("UNCHECKED_CAST")
+                val members = array[0] as List<FamilyMemberEntity>
+                @Suppress("UNCHECKED_CAST")
+                val creditCards = array[1] as List<CreditCardEntity>
+                @Suppress("UNCHECKED_CAST")
+                val debitCards = array[2] as List<DebitCardEntity>
+                @Suppress("UNCHECKED_CAST")
+                val bankAccounts = array[3] as List<BankAccountEntity>
+                @Suppress("UNCHECKED_CAST")
+                val walletsAndGifts = array[4] as List<WalletOrGiftCardEntity>
+                @Suppress("UNCHECKED_CAST")
+                val docs = array[5] as List<DocumentEntity>
+                @Suppress("UNCHECKED_CAST")
+                val subs = array[6] as List<SubscriptionEntity>
+
                 _uiState.update { current ->
                     current.copy(
                         members = members.map { it.toDomain() },
                         creditCards = creditCards.map { it.toDomain() },
                         debitCards = debitCards.map { it.toDomain() },
                         bankAccounts = bankAccounts.map { it.toDomain() },
-                        walletsAndGiftCards = walletsAndGifts.map { it.toDomain() }
+                        walletsAndGiftCards = walletsAndGifts.map { it.toDomain() },
+                        documents = docs.map { it.toDomain() },
+                        subscriptions = subs.map { it.toDomain() }
                     )
                 }
             }.collect {}
@@ -241,9 +382,29 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
         _uiState.update { it.copy(currentTab = tab) }
     }
 
-    // Functional View Toggles (List, Grid, Carousel)
+    // Section-Specific View Toggles (List, Grid, Carousel)
     fun setDisplayMode(mode: DisplayMode) {
-        _uiState.update { it.copy(displayMode = mode) }
+        val tab = _uiState.value.currentTab
+        _uiState.update { current ->
+            val updatedMap = current.sectionDisplayModes.toMutableMap()
+            updatedMap[tab] = mode
+            current.copy(sectionDisplayModes = updatedMap)
+        }
+        preferencesManager.saveSectionDisplayMode(tab, mode)
+    }
+
+    fun setDisplayModeForTab(tab: NavigationTab, mode: DisplayMode) {
+        _uiState.update { current ->
+            val updatedMap = current.sectionDisplayModes.toMutableMap()
+            updatedMap[tab] = mode
+            current.copy(sectionDisplayModes = updatedMap)
+        }
+        preferencesManager.saveSectionDisplayMode(tab, mode)
+    }
+
+    fun setCustomAccentColor(hex: String?) {
+        _uiState.update { it.copy(customAccentColorHex = hex) }
+        preferencesManager.saveCustomAccentColor(hex)
     }
 
     // Global Search
@@ -266,68 +427,82 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun toggleMaskForItem(itemId: String) {
+    // Interactive Mask / Unmask Logic (CVV, Card Numbers, Account Numbers)
+    fun toggleGlobalMask() {
         _uiState.update { state ->
-            val updated = if (state.unmaskedItemIds.contains(itemId)) {
-                state.unmaskedItemIds - itemId
-            } else {
-                state.unmaskedItemIds + itemId
-            }
-            state.copy(unmaskedItemIds = updated)
+            state.copy(
+                isMaskedGlobally = !state.isMaskedGlobally,
+                unmaskedItemIds = emptySet()
+            )
         }
     }
 
     fun toggleItemMask(itemId: String) {
-        toggleMaskForItem(itemId)
-    }
-
-    fun toggleGlobalMask() {
         _uiState.update { state ->
-            val newMask = !state.isMaskedGlobally
-            VaultPreferencesManager.saveGlobalMask(getApplication(), newMask)
-            state.copy(isMaskedGlobally = newMask, unmaskedItemIds = emptySet())
+            val unmasked = state.unmaskedItemIds.toMutableSet()
+            if (unmasked.contains(itemId)) {
+                unmasked.remove(itemId)
+            } else {
+                unmasked.add(itemId)
+            }
+            state.copy(unmaskedItemIds = unmasked)
         }
     }
 
+    // Theme toggles
+    fun toggleDarkTheme() {
+        val next = !_uiState.value.isDarkTheme
+        _uiState.update { it.copy(isDarkTheme = next) }
+        preferencesManager.saveDarkTheme(next)
+    }
+
+    fun toggleTheme() = toggleDarkTheme()
+
     fun setThemeMode(mode: AppThemeMode) {
-        VaultPreferencesManager.saveThemeMode(getApplication(), mode)
         _uiState.update {
             it.copy(
                 themeMode = mode,
-                isDarkTheme = (mode != AppThemeMode.LIGHT && mode != AppThemeMode.DOODLE && mode != AppThemeMode.PAPERLIKE)
+                isDarkTheme = if (mode == AppThemeMode.SYSTEM) it.isDarkTheme else mode.isDark
             )
+        }
+        preferencesManager.saveThemeMode(mode)
+    }
+
+    // Biometrics & PIN Security
+    fun setMasterPin(newPin: String) {
+        if (newPin.length == 4) {
+            _uiState.update { it.copy(masterPin = newPin, notificationMessage = "Master PIN successfully updated") }
+            preferencesManager.saveMasterPin(newPin)
         }
     }
 
-    fun toggleTheme() {
-        _uiState.update { state ->
-            val nextTheme = when (state.themeMode) {
-                AppThemeMode.DOODLE -> AppThemeMode.DOODLE_DARK
-                AppThemeMode.DOODLE_DARK -> AppThemeMode.LIGHT
-                AppThemeMode.LIGHT -> AppThemeMode.DARK
-                AppThemeMode.DARK -> AppThemeMode.PITCH_BLACK
-                AppThemeMode.PITCH_BLACK -> AppThemeMode.HIGH_CONTRAST
-                AppThemeMode.HIGH_CONTRAST -> AppThemeMode.PAPERLIKE
-                AppThemeMode.PAPERLIKE -> AppThemeMode.DOODLE
-                AppThemeMode.SYSTEM -> AppThemeMode.DOODLE
-            }
-            VaultPreferencesManager.saveThemeMode(getApplication(), nextTheme)
-            state.copy(
-                themeMode = nextTheme,
-                isDarkTheme = (nextTheme != AppThemeMode.LIGHT && nextTheme != AppThemeMode.DOODLE && nextTheme != AppThemeMode.PAPERLIKE)
-            )
-        }
+    fun verifyPin(pin: String): Boolean {
+        return pin == _uiState.value.masterPin
     }
 
     fun toggleBiometricEnabled() {
-        _uiState.update { state ->
-            val newBio = !state.biometricEnabled
-            VaultPreferencesManager.saveBiometricEnabled(getApplication(), newBio)
-            state.copy(biometricEnabled = newBio)
-        }
+        val current = _uiState.value.biometricEnabled
+        val next = !current
+        _uiState.update { it.copy(biometricEnabled = next) }
+        preferencesManager.saveBiometricEnabled(next)
     }
 
-    // Dialog Visibilities & Editing Setters
+    fun toggleClipboardAutoClear() {
+        val next = !_uiState.value.clipboardAutoClearEnabled
+        _uiState.update { it.copy(clipboardAutoClearEnabled = next) }
+        preferencesManager.saveClipboardAutoClearEnabled(next)
+    }
+
+    fun setClipboardClearTimeout(seconds: Int) {
+        _uiState.update { it.copy(clipboardClearTimeoutSeconds = seconds) }
+        preferencesManager.saveClipboardClearTimeout(seconds)
+    }
+
+    fun setBiometricStatusMessage(msg: String?) {
+        _uiState.update { it.copy(biometricStatusMessage = msg) }
+    }
+
+    // Dialog state management
     fun setAddCreditCardDialogVisible(visible: Boolean) {
         _uiState.update { it.copy(showAddCreditCardDialog = visible, editingCreditCard = if (!visible) null else it.editingCreditCard) }
     }
@@ -366,6 +541,14 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
 
     fun openEditMember(member: FamilyMember) {
         _uiState.update { it.copy(showAddMemberDialog = true, editingMember = member) }
+    }
+
+    fun setAddDocumentDialogVisible(visible: Boolean) {
+        _uiState.update { it.copy(showAddDocumentDialog = visible, editingPersonalDocument = if (!visible) null else it.editingPersonalDocument) }
+    }
+
+    fun openEditPersonalDocument(doc: Document) {
+        _uiState.update { it.copy(showAddDocumentDialog = true, editingPersonalDocument = doc) }
     }
 
     // CRUD: Credit Cards (Persisted in Room)
@@ -524,6 +707,47 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    // CRUD: Personal Documents (Persisted in Room)
+    fun saveDocument(doc: Document) {
+        viewModelScope.launch {
+            try {
+                if (_uiState.value.documents.any { it.id == doc.id }) {
+                    repository.updateDocument(doc.toEntity())
+                    _uiState.update {
+                        it.copy(
+                            showAddDocumentDialog = false,
+                            editingPersonalDocument = null,
+                            notificationMessage = "Updated ${doc.displayTitle}"
+                        )
+                    }
+                } else {
+                    repository.insertDocument(doc.toEntity())
+                    _uiState.update {
+                        it.copy(
+                            showAddDocumentDialog = false,
+                            editingPersonalDocument = null,
+                            notificationMessage = "Saved ${doc.displayTitle} to vault"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(notificationMessage = "Failed to save document: ${e.message}") }
+            }
+        }
+    }
+
+    fun savePersonalDocument(doc: Document) = saveDocument(doc)
+
+    fun deleteDocument(docId: String) {
+        viewModelScope.launch {
+            val doc = _uiState.value.documents.find { it.id == docId }
+            repository.deleteDocument(docId)
+            _uiState.update { it.copy(notificationMessage = "Removed ${doc?.displayTitle ?: "Document"} from vault") }
+        }
+    }
+
+    fun deletePersonalDocument(docId: String) = deleteDocument(docId)
+
     fun lockApp() {
         _uiState.update { it.copy(isAppLocked = true) }
     }
@@ -540,14 +764,18 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             _uiState.update { it.copy(driveSync = it.driveSync.copy(isSyncing = true)) }
             val current = _uiState.value
-            val snapshot = GoogleDriveBackupManager.backupVaultToDrive(
+            val snapshot = DriveBackupRepository.backupVaultToDrive(
                 context = getApplication(),
                 members = current.members,
                 creditCards = current.creditCards,
                 debitCards = current.debitCards,
                 bankAccounts = current.bankAccounts,
-                walletsAndGiftCards = current.walletsAndGiftCards
+                walletsAndGiftCards = current.walletsAndGiftCards,
+                documents = current.documents,
+                subscriptions = current.subscriptions,
+                includePhotos = current.includePhotosInBackup
             )
+            val photoNote = if (current.includePhotosInBackup) " (photos included)" else " (photos excluded)"
             _uiState.update {
                 it.copy(
                     driveSync = DriveSyncState(
@@ -555,15 +783,17 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
                         isRestoring = false,
                         lastSyncTimestamp = snapshot.timestamp,
                         lastSyncTime = snapshot.timestamp,
-                        backupFileName = "family_wallet_vault_backup.json",
+                        backupFileName = "vault_backup_${System.currentTimeMillis()}.enc",
                         isConfigured = true,
-                        lastSyncStatus = "Backed up ${snapshot.members.size} members, ${snapshot.creditCards.size + snapshot.debitCards.size} cards, ${snapshot.bankAccounts.size} accounts",
+                        lastSyncStatus = "Backed up ${snapshot.members.size} members, ${snapshot.creditCards.size + snapshot.debitCards.size} cards, ${snapshot.bankAccounts.size} accounts, ${snapshot.documents.size} docs$photoNote",
                         lastBackupMemberCount = snapshot.members.size,
                         lastBackupCardCount = snapshot.creditCards.size + snapshot.debitCards.size,
                         lastBackupBankCount = snapshot.bankAccounts.size,
-                        lastBackupWalletCount = snapshot.walletsAndGiftCards.size
+                        lastBackupWalletCount = snapshot.walletsAndGiftCards.size,
+                        lastBackupDocumentCount = snapshot.documents.size,
+                        lastBackupAttachmentCount = snapshot.attachmentFileNames.size
                     ),
-                    notificationMessage = "Vault encrypted and backed up to Google Drive (${snapshot.timestamp})"
+                    notificationMessage = "Vault encrypted and backed up to Google Drive$photoNote (${snapshot.timestamp})"
                 )
             }
         }
@@ -572,7 +802,7 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
     fun restoreFromGoogleDrive() {
         viewModelScope.launch {
             _uiState.update { it.copy(driveSync = it.driveSync.copy(isRestoring = true)) }
-            val restoredSnapshot = GoogleDriveBackupManager.restoreVaultFromDrive(
+            val restoredSnapshot = DriveBackupRepository.restoreVaultFromDrive(
                 context = getApplication(),
                 repository = repository
             )
@@ -581,7 +811,7 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
                     it.copy(
                         driveSync = it.driveSync.copy(
                             isRestoring = false,
-                            lastSyncStatus = "Restored ${restoredSnapshot.members.size} members, ${restoredSnapshot.creditCards.size + restoredSnapshot.debitCards.size} cards, ${restoredSnapshot.bankAccounts.size} accounts"
+                            lastSyncStatus = "Restored ${restoredSnapshot.members.size} members, ${restoredSnapshot.creditCards.size + restoredSnapshot.debitCards.size} cards, ${restoredSnapshot.bankAccounts.size} accounts, ${restoredSnapshot.documents.size} docs"
                         ),
                         notificationMessage = "Successfully restored vault from Google Drive (${restoredSnapshot.timestamp})"
                     )
@@ -596,6 +826,229 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
                         notificationMessage = "No backup found on Google Drive to restore."
                     )
                 }
+            }
+        }
+    }
+
+    fun loadAvailableDriveBackups() {
+        viewModelScope.launch {
+            val list = DriveBackupRepository.getAvailableBackupFilesInfo(getApplication())
+            _uiState.update { it.copy(availableDriveBackups = list) }
+        }
+    }
+
+    fun restoreSpecificDriveBackup(fileName: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(driveSync = it.driveSync.copy(isRestoring = true)) }
+            val restoredSnapshot = DriveBackupRepository.restoreSpecificBackupFromDrive(
+                context = getApplication(),
+                fileName = fileName,
+                repository = repository
+            )
+            if (restoredSnapshot != null) {
+                _uiState.update {
+                    it.copy(
+                        driveSync = it.driveSync.copy(
+                            isRestoring = false,
+                            lastSyncStatus = "Restored backup ($fileName)"
+                        ),
+                        notificationMessage = "Successfully restored backup: $fileName"
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        driveSync = it.driveSync.copy(
+                            isRestoring = false,
+                            lastSyncStatus = "Failed to restore backup $fileName"
+                        ),
+                        notificationMessage = "Failed to restore backup $fileName"
+                    )
+                }
+            }
+        }
+    }
+
+    fun updateAutoBackupSettings(frequency: String, onOpen: Boolean, onClose: Boolean) {
+        _uiState.update { it.copy(autoBackupFrequency = frequency, autoBackupOnOpen = onOpen, autoBackupOnClose = onClose) }
+        preferencesManager.saveAutoBackupFrequency(frequency)
+        preferencesManager.saveAutoBackupOnOpen(onOpen)
+        preferencesManager.saveAutoBackupOnClose(onClose)
+    }
+
+    fun setIncludePhotosInBackup(include: Boolean) {
+        _uiState.update { it.copy(includePhotosInBackup = include) }
+        preferencesManager.saveIncludePhotosInBackup(include)
+    }
+
+    fun performAutoBackupOnOpen() {
+        if (_uiState.value.autoBackupOnOpen) {
+            syncWithGoogleDrive()
+        }
+    }
+
+    fun performAutoBackupOnClose() {
+        if (_uiState.value.autoBackupOnClose) {
+            viewModelScope.launch {
+                val current = _uiState.value
+                DriveBackupRepository.backupVaultToDrive(
+                    context = getApplication(),
+                    members = current.members,
+                    creditCards = current.creditCards,
+                    debitCards = current.debitCards,
+                    bankAccounts = current.bankAccounts,
+                    walletsAndGiftCards = current.walletsAndGiftCards,
+                    documents = current.documents,
+                    subscriptions = current.subscriptions,
+                    includePhotos = current.includePhotosInBackup
+                )
+            }
+        }
+    }
+
+    // Subscriptions CRUD
+    fun openAddSubscription() {
+        _uiState.update { it.copy(showAddSubscriptionDialog = true, editingSubscription = null) }
+    }
+
+    fun openEditSubscription(sub: Subscription) {
+        _uiState.update { it.copy(showAddSubscriptionDialog = true, editingSubscription = sub) }
+    }
+
+    fun closeSubscriptionDialog() {
+        _uiState.update { it.copy(showAddSubscriptionDialog = false, editingSubscription = null) }
+    }
+
+    fun saveSubscription(sub: Subscription) {
+        viewModelScope.launch {
+            repository.insertSubscription(sub.toEntity())
+            _uiState.update {
+                it.copy(
+                    showAddSubscriptionDialog = false,
+                    editingSubscription = null,
+                    notificationMessage = "Saved ${sub.name} subscription"
+                )
+            }
+        }
+    }
+
+    fun deleteSubscription(subId: String) {
+        viewModelScope.launch {
+            val sub = _uiState.value.subscriptions.find { it.id == subId }
+            repository.deleteSubscription(subId)
+            _uiState.update { it.copy(notificationMessage = "Removed ${sub?.name ?: "Subscription"}") }
+        }
+    }
+
+    // Credit Card Bill Tracker
+    fun toggleCreditCardBillPaid(cardId: String) {
+        viewModelScope.launch {
+            val card = _uiState.value.creditCards.find { it.id == cardId } ?: return@launch
+            val nowPaid = !card.isBillPaid
+            val todayStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date())
+            val updated = card.copy(
+                isBillPaid = nowPaid,
+                lastPaidDate = if (nowPaid) todayStr else ""
+            )
+            repository.updateCreditCard(updated.toEntity())
+            _uiState.update {
+                it.copy(notificationMessage = if (nowPaid) "Marked ${card.cardName} bill as Paid ✓" else "Marked ${card.cardName} bill as Unpaid")
+            }
+        }
+    }
+
+    // Gift Card Balance Spend/Deduct
+    fun deductGiftCardBalance(cardId: String, spentAmount: Double) {
+        viewModelScope.launch {
+            val card = _uiState.value.walletsAndGiftCards.find { it.id == cardId } ?: return@launch
+            val newBalance = (card.currentBalance - spentAmount).coerceAtLeast(0.0)
+            val updated = card.copy(currentBalance = newBalance)
+            repository.updateWalletOrGiftCard(updated.toEntity())
+            _uiState.update {
+                it.copy(
+                    spendingGiftCard = null,
+                    notificationMessage = "Deducted ₹${spentAmount.toInt()} from ${card.providerOrName}. Remaining: ₹${newBalance.toInt()}"
+                )
+            }
+        }
+    }
+
+    // UPI QR Code Generator
+    fun showUpiQr(vpa: String, payeeName: String) {
+        _uiState.update { it.copy(activeUpiQrData = Pair(vpa, payeeName)) }
+    }
+
+    fun closeUpiQr() {
+        _uiState.update { it.copy(activeUpiQrData = null) }
+    }
+
+    // Emergency Helplines Sheet
+    fun openHelplines(bankName: String = "") {
+        _uiState.update { it.copy(showHelplineDialog = true, helplineTargetBank = bankName) }
+    }
+
+    fun closeHelplines() {
+        _uiState.update { it.copy(showHelplineDialog = false, helplineTargetBank = "") }
+    }
+
+    // Emergency ICE Dialog
+    fun openEmergencyIce() {
+        _uiState.update { it.copy(showEmergencyIceDialog = true) }
+    }
+
+    fun closeEmergencyIce() {
+        _uiState.update { it.copy(showEmergencyIceDialog = false) }
+    }
+
+    // Vault Security Checkup Dialog
+    fun openSecurityCheckup() {
+        _uiState.update { it.copy(showSecurityCheckupDialog = true) }
+    }
+
+    fun closeSecurityCheckup() {
+        _uiState.update { it.copy(showSecurityCheckupDialog = false) }
+    }
+
+    // Gift Card Spend Dialog
+    fun openSpendGiftCard(item: WalletOrGiftCard) {
+        _uiState.update { it.copy(spendingGiftCard = item) }
+    }
+
+    fun closeSpendGiftCard() {
+        _uiState.update { it.copy(spendingGiftCard = null) }
+    }
+
+    // Encrypted Local JSON Export / Import
+    fun exportVaultJson(onSuccess: (String) -> Unit) {
+        val current = _uiState.value
+        val snapshot = com.example.sync.VaultBackupSnapshot(
+            version = 3,
+            timestamp = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date()),
+            members = current.members,
+            creditCards = current.creditCards,
+            debitCards = current.debitCards,
+            bankAccounts = current.bankAccounts,
+            walletsAndGiftCards = current.walletsAndGiftCards,
+            documents = current.documents,
+            subscriptions = current.subscriptions
+        )
+        val json = DriveBackupRepository.exportVaultToJson(snapshot)
+        onSuccess(json)
+    }
+
+    fun importVaultJson(json: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val restored = DriveBackupRepository.importVaultFromJson(json, repository)
+            if (restored != null) {
+                _uiState.update {
+                    it.copy(notificationMessage = "Successfully restored vault backup (${restored.timestamp})")
+                }
+                onComplete(true)
+            } else {
+                _uiState.update {
+                    it.copy(notificationMessage = "Failed to restore backup: Invalid file format")
+                }
+                onComplete(false)
             }
         }
     }

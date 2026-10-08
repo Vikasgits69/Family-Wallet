@@ -1,6 +1,9 @@
 package com.example
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -35,14 +38,22 @@ import com.example.ui.components.FamilyWalletTopBar
 import com.example.ui.screens.AccountsScreen
 import com.example.ui.screens.AddAccountDialog
 import com.example.ui.screens.AddCardDialog
+import com.example.ui.screens.AddDocumentSheet
 import com.example.ui.screens.AddMemberDialog
 import com.example.ui.screens.AddWalletDialog
 import com.example.ui.screens.BiometricLockScreen
 import com.example.ui.screens.CardsScreen
 import com.example.ui.screens.DashboardScreen
+import com.example.ui.screens.DocsVaultScreen
 import com.example.ui.screens.FamilyMembersScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.WalletsScreen
+import com.example.ui.screens.AddSubscriptionDialog
+import com.example.ui.components.EmergencyHelplineSheet
+import com.example.ui.components.EmergencyIceDialog
+import com.example.ui.components.SecurityCheckupDialog
+import com.example.ui.components.SpendGiftCardDialog
+import com.example.ui.components.UpiQrDialog
 import com.example.ui.theme.FamilyWalletTheme
 import com.example.ui.viewmodel.FamilyWalletViewModel
 
@@ -59,7 +70,10 @@ class MainActivity : FragmentActivity() {
             walletViewModel = vm
             val state by vm.uiState.collectAsStateWithLifecycle()
 
-            FamilyWalletTheme(themeMode = state.themeMode) {
+            FamilyWalletTheme(
+                themeMode = state.themeMode,
+                customAccentHex = state.customAccentColorHex
+            ) {
                 FamilyWalletApp(
                     viewModel = vm,
                     onRequestBiometrics = {
@@ -91,27 +105,18 @@ class MainActivity : FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Lock the vault whenever app is closed, minimized or switched away
-        walletViewModel?.let { vm ->
-            if (vm.uiState.value.biometricEnabled) {
-                vm.lockApp()
-            }
-        }
+        walletViewModel?.performAutoBackupOnClose()
     }
 
     override fun onStop() {
         super.onStop()
-        // Ensure vault is locked when app is stopped
-        walletViewModel?.let { vm ->
-            if (vm.uiState.value.biometricEnabled) {
-                vm.lockApp()
-            }
-        }
+        walletViewModel?.performAutoBackupOnClose()
     }
 
     override fun onResume() {
         super.onResume()
         walletViewModel?.let { vm ->
+            vm.performAutoBackupOnOpen()
             if (vm.uiState.value.biometricEnabled && vm.uiState.value.isAppLocked) {
                 val canAuth = BiometricAuthManager.checkAvailability(this)
                 if (canAuth.canPrompt) {
@@ -119,7 +124,9 @@ class MainActivity : FragmentActivity() {
                         activity = this,
                         title = "Family Financial Vault",
                         subtitle = "Authenticate to unlock vault",
-                        onSuccess = { vm.unlockApp() },
+                        onSuccess = {
+                            vm.unlockApp()
+                        },
                         onError = { _, _ -> },
                         onFailed = {}
                     )
@@ -177,7 +184,9 @@ fun FamilyWalletApp(
                     onLockApp = { viewModel.lockApp() },
                     onSearchQueryChange = { query -> viewModel.setSearchQuery(query) },
                     onSetDisplayMode = { mode -> viewModel.setDisplayMode(mode) },
-                    onSetThemeMode = { mode -> viewModel.setThemeMode(mode) }
+                    onSetThemeMode = { mode -> viewModel.setThemeMode(mode) },
+                    onSetCustomAccent = { hex -> viewModel.setCustomAccentColor(hex) },
+                    onNavigateTab = { tab -> viewModel.setNavigationTab(tab) }
                 )
             },
             bottomBar = {
@@ -211,7 +220,10 @@ fun FamilyWalletApp(
                             onOpenAddDebitCard = { viewModel.setAddDebitCardDialogVisible(true) },
                             onOpenAddAccount = { viewModel.setAddAccountDialogVisible(true) },
                             onOpenAddWallet = { viewModel.setAddWalletDialogVisible(true) },
-                            onOpenAddMember = { viewModel.setAddMemberDialogVisible(true) }
+                            onOpenAddMember = { viewModel.setAddMemberDialogVisible(true) },
+                            onOpenEmergencyIce = { viewModel.openEmergencyIce() },
+                            onOpenSecurityCheckup = { viewModel.openSecurityCheckup() },
+                            onOpenHelplines = { viewModel.openHelplines() }
                         )
 
                         NavigationTab.CARDS -> CardsScreen(
@@ -223,7 +235,9 @@ fun FamilyWalletApp(
                             onToggleCardFlip = { cardId -> viewModel.toggleCardFlip(cardId) },
                             onToggleItemMask = { itemId -> viewModel.toggleItemMask(itemId) },
                             onDeleteCreditCard = { id -> viewModel.deleteCreditCard(id) },
-                            onDeleteDebitCard = { id -> viewModel.deleteDebitCard(id) }
+                            onDeleteDebitCard = { id -> viewModel.deleteDebitCard(id) },
+                            onToggleBillPaid = { cardId -> viewModel.toggleCreditCardBillPaid(cardId) },
+                            onOpenHelpline = { bankName -> viewModel.openHelplines(bankName) }
                         )
 
                         NavigationTab.ACCOUNTS -> AccountsScreen(
@@ -238,7 +252,20 @@ fun FamilyWalletApp(
                             uiState = state,
                             onOpenAddWallet = { viewModel.setAddWalletDialogVisible(true) },
                             onOpenEditWalletOrGiftCard = { item -> viewModel.openEditWalletOrGiftCard(item) },
-                            onDeleteWalletOrGiftCard = { id -> viewModel.deleteWalletOrGiftCard(id) }
+                            onDeleteWalletOrGiftCard = { id -> viewModel.deleteWalletOrGiftCard(id) },
+                            onOpenAddSubscription = { viewModel.openAddSubscription() },
+                            onOpenEditSubscription = { sub -> viewModel.openEditSubscription(sub) },
+                            onDeleteSubscription = { id -> viewModel.deleteSubscription(id) },
+                            onOpenSpendGiftCard = { item -> viewModel.openSpendGiftCard(item) },
+                            onShowUpiQr = { vpa, name -> viewModel.showUpiQr(vpa, name) }
+                        )
+
+                        NavigationTab.DOCUMENTS -> DocsVaultScreen(
+                            uiState = state,
+                            onOpenAddDocument = { viewModel.setAddDocumentDialogVisible(true) },
+                            onOpenEditDocument = { doc -> viewModel.openEditPersonalDocument(doc) },
+                            onDeleteDocument = { id -> viewModel.deletePersonalDocument(id) },
+                            onToggleMask = { id -> viewModel.toggleItemMask(id) }
                         )
 
                         NavigationTab.MEMBERS -> FamilyMembersScreen(
@@ -246,16 +273,51 @@ fun FamilyWalletApp(
                             onSelectMember = { memberId -> viewModel.setSelectedMember(memberId) },
                             onOpenAddMember = { viewModel.setAddMemberDialogVisible(true) },
                             onOpenEditMember = { member -> viewModel.openEditMember(member) },
-                            onDeleteMember = { memberId -> viewModel.deleteFamilyMember(memberId) }
+                            onDeleteMember = { memberId -> viewModel.deleteFamilyMember(memberId) },
+                            onOpenAddDocument = { memberId ->
+                                if (memberId != null) viewModel.setSelectedMember(memberId)
+                                viewModel.setAddDocumentDialogVisible(true)
+                            },
+                            onOpenEditDocument = { doc -> viewModel.openEditPersonalDocument(doc) },
+                            onDeleteDocument = { id -> viewModel.deletePersonalDocument(id) },
+                            onToggleDocumentMask = { id -> viewModel.toggleItemMask(id) },
+                            onOpenEmergencyIce = { viewModel.openEmergencyIce() }
                         )
 
                         NavigationTab.SETTINGS -> SettingsScreen(
                             uiState = state,
                             onSetThemeMode = { mode -> viewModel.setThemeMode(mode) },
+                            onSetCustomAccent = { hex -> viewModel.setCustomAccentColor(hex) },
                             onToggleBiometric = { viewModel.toggleBiometricEnabled() },
                             onLockApp = { viewModel.lockApp() },
                             onSyncGoogleDrive = { viewModel.syncWithGoogleDrive() },
-                            onRestoreGoogleDrive = { viewModel.restoreFromGoogleDrive() }
+                            onRestoreGoogleDrive = { viewModel.restoreFromGoogleDrive() },
+                            onUpdateAutoBackupSettings = { freq, open, close -> viewModel.updateAutoBackupSettings(freq, open, close) },
+                            onToggleIncludePhotosInBackup = { include -> viewModel.setIncludePhotosInBackup(include) },
+                            onToggleClipboardAutoClear = { viewModel.toggleClipboardAutoClear() },
+                            onSetClipboardTimeout = { sec -> viewModel.setClipboardClearTimeout(sec) },
+                            onOpenSecurityCheckup = { viewModel.openSecurityCheckup() },
+                            onOpenEmergencyIce = { viewModel.openEmergencyIce() },
+                            onOpenHelplines = { viewModel.openHelplines() },
+                            onExportJson = {
+                                viewModel.exportVaultJson { json ->
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, json)
+                                        type = "application/json"
+                                    }
+                                    val shareIntent = android.content.Intent.createChooser(sendIntent, "Export Encrypted Vault Backup")
+                                    context.startActivity(shareIntent)
+                                }
+                            },
+                            onImportJson = { json ->
+                                viewModel.importVaultJson(json) { success ->
+                                    val msg = if (success) "Vault restored successfully" else "Failed to restore vault"
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onLoadBackups = { viewModel.loadAvailableDriveBackups() },
+                            onRestoreSpecificBackup = { fileName -> viewModel.restoreSpecificDriveBackup(fileName) }
                         )
                     }
                 }
@@ -267,6 +329,9 @@ fun FamilyWalletApp(
     if (state.showAddCreditCardDialog || state.showAddDebitCardDialog) {
         AddCardDialog(
             members = state.members,
+            existingCreditCards = state.creditCards,
+            existingDebitCards = state.debitCards,
+            existingBankAccounts = state.bankAccounts,
             creditCardToEdit = state.editingCreditCard,
             debitCardToEdit = state.editingDebitCard,
             initialIsCredit = state.showAddCreditCardDialog,
@@ -282,6 +347,9 @@ fun FamilyWalletApp(
     if (state.showAddAccountDialog) {
         AddAccountDialog(
             members = state.members,
+            existingCreditCards = state.creditCards,
+            existingDebitCards = state.debitCards,
+            existingBankAccounts = state.bankAccounts,
             accountToEdit = state.editingBankAccount,
             onDismiss = { viewModel.setAddAccountDialogVisible(false) },
             onSaveAccount = { account -> viewModel.saveBankAccount(account) }
@@ -302,6 +370,64 @@ fun FamilyWalletApp(
             memberToEdit = state.editingMember,
             onDismiss = { viewModel.setAddMemberDialogVisible(false) },
             onConfirm = { member -> viewModel.saveFamilyMember(member) }
+        )
+    }
+
+    if (state.showAddDocumentDialog) {
+        AddDocumentSheet(
+            members = state.members,
+            initialMemberId = state.selectedMemberId,
+            documentToEdit = state.editingPersonalDocument,
+            onDismiss = { viewModel.setAddDocumentDialogVisible(false) },
+            onSaveDocument = { doc -> viewModel.savePersonalDocument(doc) }
+        )
+    }
+
+    if (state.showAddSubscriptionDialog) {
+        AddSubscriptionDialog(
+            members = state.members,
+            subscriptionToEdit = state.editingSubscription,
+            onDismiss = { viewModel.closeSubscriptionDialog() },
+            onSaveSubscription = { sub -> viewModel.saveSubscription(sub) }
+        )
+    }
+
+    if (state.showEmergencyIceDialog) {
+        EmergencyIceDialog(
+            uiState = state,
+            onDismiss = { viewModel.closeEmergencyIce() }
+        )
+    }
+
+    if (state.showSecurityCheckupDialog) {
+        SecurityCheckupDialog(
+            uiState = state,
+            onDismiss = { viewModel.closeSecurityCheckup() }
+        )
+    }
+
+    if (state.showHelplineDialog) {
+        EmergencyHelplineSheet(
+            uiState = state,
+            initialSearchBank = state.helplineTargetBank,
+            onDismiss = { viewModel.closeHelplines() }
+        )
+    }
+
+    state.activeUpiQrData?.let { (vpa, name) ->
+        UpiQrDialog(
+            vpaOrUpiId = vpa,
+            payeeName = name,
+            bankNameOrWallet = "",
+            onDismiss = { viewModel.closeUpiQr() }
+        )
+    }
+
+    state.spendingGiftCard?.let { giftCard ->
+        SpendGiftCardDialog(
+            giftCard = giftCard,
+            onDismiss = { viewModel.closeSpendGiftCard() },
+            onConfirmSpend = { amount -> viewModel.deductGiftCardBalance(giftCard.id, amount) }
         )
     }
 }

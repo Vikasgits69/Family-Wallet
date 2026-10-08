@@ -10,6 +10,8 @@ class VaultRepository(private val dao: FamilyWalletDao) {
     val allDebitCards: Flow<List<DebitCardEntity>> = dao.getAllDebitCards()
     val allBankAccounts: Flow<List<BankAccountEntity>> = dao.getAllBankAccounts()
     val allWalletsAndGiftCards: Flow<List<WalletOrGiftCardEntity>> = dao.getAllWalletsAndGiftCards()
+    val allDocuments: Flow<List<DocumentEntity>> = dao.getAllDocuments()
+    val allSubscriptions: Flow<List<SubscriptionEntity>> = dao.getAllSubscriptions()
 
     // Family Member CRUD
     suspend fun insertMember(member: FamilyMemberEntity) = dao.insertMember(member)
@@ -21,6 +23,8 @@ class VaultRepository(private val dao: FamilyWalletDao) {
         dao.unassignDebitCardsForMember(memberId)
         dao.unassignBankAccountsForMember(memberId)
         dao.unassignWalletsAndGiftCardsForMember(memberId)
+        dao.unassignDocumentsForMember(memberId)
+        dao.unassignSubscriptionsForMember(memberId)
     }
 
     // Credit Card CRUD
@@ -42,4 +46,25 @@ class VaultRepository(private val dao: FamilyWalletDao) {
     suspend fun insertWalletOrGiftCard(item: WalletOrGiftCardEntity) = dao.insertWalletOrGiftCard(item)
     suspend fun updateWalletOrGiftCard(item: WalletOrGiftCardEntity) = dao.updateWalletOrGiftCard(item)
     suspend fun deleteWalletOrGiftCard(itemId: String) = dao.deleteWalletOrGiftCardById(itemId)
+
+    // Documents CRUD
+    suspend fun insertDocument(doc: DocumentEntity) = dao.insertDocument(doc)
+    suspend fun updateDocument(doc: DocumentEntity) = dao.updateDocument(doc)
+    suspend fun deleteDocument(docId: String) = dao.deleteDocumentById(docId)
+
+    // Subscriptions CRUD
+    suspend fun insertSubscription(sub: SubscriptionEntity) = dao.insertSubscription(sub)
+    suspend fun updateSubscription(sub: SubscriptionEntity) = dao.updateSubscription(sub)
+    suspend fun deleteSubscription(subId: String) = dao.deleteSubscriptionById(subId)
+
+    // Overwrite all data inside a single atomic Room transaction
+    suspend fun overwriteAllData(
+        members: List<FamilyMemberEntity>,
+        creditCards: List<CreditCardEntity>,
+        debitCards: List<DebitCardEntity>,
+        bankAccounts: List<BankAccountEntity>,
+        walletsAndGiftCards: List<WalletOrGiftCardEntity>,
+        documents: List<DocumentEntity>,
+        subscriptions: List<SubscriptionEntity> = emptyList()
+    ) = dao.overwriteAllData(members, creditCards, debitCards, bankAccounts, walletsAndGiftCards, documents, subscriptions)
 }

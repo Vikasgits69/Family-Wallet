@@ -26,11 +26,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.outlined.ViewCarousel
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +70,7 @@ import coil.compose.AsyncImage
 import com.example.data.AppThemeMode
 import com.example.data.DisplayMode
 import com.example.data.FamilyMember
+import com.example.data.NavigationTab
 import com.example.ui.viewmodel.FamilyWalletUiState
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -80,10 +84,13 @@ fun FamilyWalletTopBar(
     onSearchQueryChange: (String) -> Unit,
     onSetDisplayMode: (DisplayMode) -> Unit,
     modifier: Modifier = Modifier,
-    onSetThemeMode: ((AppThemeMode) -> Unit)? = null
+    onSetThemeMode: ((AppThemeMode) -> Unit)? = null,
+    onSetCustomAccent: ((String?) -> Unit)? = null,
+    onNavigateTab: (NavigationTab) -> Unit = {}
 ) {
     var memberDropdownExpanded by remember { mutableStateOf(false) }
     var themeDropdownExpanded by remember { mutableStateOf(false) }
+    var showColorPickerDialog by remember { mutableStateOf(false) }
     var isSearchExpanded by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val haptic = LocalHapticFeedback.current
@@ -109,13 +116,14 @@ fun FamilyWalletTopBar(
             ) {
                 // App Branding (Google Wallet Styled)
                 Row(
+                    modifier = Modifier.weight(1f, fill = false),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
@@ -123,43 +131,46 @@ fun FamilyWalletTopBar(
                             imageVector = Icons.Outlined.AccountBalanceWallet,
                             contentDescription = "Family Wallet Logo",
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
                     Column {
                         Text(
                             text = "Family Wallet",
-                            style = MaterialTheme.typography.titleLarge.copy(
+                            style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = (-0.5).sp
+                                letterSpacing = (-0.3).sp
                             ),
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
                         )
                         Text(
                             text = "Financial Information Vault",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                     }
                 }
 
-                // Quick Action Icons: Search, Global Mask Eye, Theme Dropdown, Lock
-                FlowRow(
-                    verticalArrangement = Arrangement.Center,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Quick Action Icons: Search, Global Mask Eye, Theme Dropdown, Settings, Lock
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     // Global Search Toggle
                     IconButton(
                         onClick = { isSearchExpanded = !isSearchExpanded },
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .testTag("search_toggle_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search Vault",
-                            tint = if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
@@ -170,13 +181,14 @@ fun FamilyWalletTopBar(
                             onToggleGlobalMask()
                         },
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .testTag("global_mask_toggle_button")
                     ) {
                         Icon(
                             imageVector = if (uiState.isMaskedGlobally) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = "Toggle Data Masking",
-                            tint = if (uiState.isMaskedGlobally) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (uiState.isMaskedGlobally) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
@@ -192,13 +204,14 @@ fun FamilyWalletTopBar(
                                 }
                             },
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(36.dp)
                                 .testTag("theme_toggle_button")
                         ) {
                             Icon(
                                 imageVector = if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
                                 contentDescription = "Switch Theme",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
@@ -222,29 +235,85 @@ fun FamilyWalletTopBar(
                                         themeDropdownExpanded = false
                                     },
                                     trailingIcon = {
-                                        if (uiState.themeMode == mode) {
+                                        if (uiState.themeMode == mode && uiState.customAccentColorHex == null) {
                                             Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                         }
                                     }
                                 )
                             }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ColorLens,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Custom Accent Color...",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    themeDropdownExpanded = false
+                                    showColorPickerDialog = true
+                                },
+                                trailingIcon = {
+                                    if (uiState.customAccentColorHex != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
+                                    }
+                                }
+                            )
                         }
                     }
 
-                    // Lock Vault
+                    // Lock Vault (placed before Settings)
                     IconButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onLockApp()
                         },
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .testTag("lock_app_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "Lock Vault",
-                            tint = MaterialTheme.colorScheme.error
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Settings Button (at the end)
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onNavigateTab(NavigationTab.SETTINGS)
+                        },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("settings_top_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -318,12 +387,11 @@ fun FamilyWalletTopBar(
                     // 1. Member Filter Dropdown Selector
                     Box {
                         Surface(
+                            onClick = { memberDropdownExpanded = true },
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                            modifier = Modifier
-                                .clickable { memberDropdownExpanded = true }
-                                .testTag("member_filter_dropdown")
+                            modifier = Modifier.testTag("member_filter_dropdown")
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
@@ -423,36 +491,56 @@ fun FamilyWalletTopBar(
                         }
                     }
 
-                    // 2. Functional View Mode Toggles (Carousel, Grid, List)
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    // 2. Functional View Mode Toggles (Carousel, Grid, List) - Shown on supported sections
+                    if (uiState.currentTab in setOf(
+                            com.example.data.NavigationTab.CARDS,
+                            com.example.data.NavigationTab.ACCOUNTS,
+                            com.example.data.NavigationTab.WALLETS,
+                            com.example.data.NavigationTab.DOCUMENTS,
+                            com.example.data.NavigationTab.MEMBERS
+                        )
                     ) {
-                        Row(modifier = Modifier.padding(2.dp)) {
-                            ViewModeIconButton(
-                                icon = Icons.Outlined.ViewCarousel,
-                                isSelected = uiState.displayMode == DisplayMode.CAROUSEL,
-                                onClick = { onSetDisplayMode(DisplayMode.CAROUSEL) },
-                                contentDescription = "Carousel View"
-                            )
-                            ViewModeIconButton(
-                                icon = Icons.Outlined.GridView,
-                                isSelected = uiState.displayMode == DisplayMode.GRID,
-                                onClick = { onSetDisplayMode(DisplayMode.GRID) },
-                                contentDescription = "Grid View"
-                            )
-                            ViewModeIconButton(
-                                icon = Icons.Outlined.ViewList,
-                                isSelected = uiState.displayMode == DisplayMode.LIST,
-                                onClick = { onSetDisplayMode(DisplayMode.LIST) },
-                                contentDescription = "List View"
-                            )
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(2.dp)) {
+                                ViewModeIconButton(
+                                    icon = Icons.Outlined.ViewCarousel,
+                                    isSelected = uiState.displayMode == DisplayMode.CAROUSEL,
+                                    onClick = { onSetDisplayMode(DisplayMode.CAROUSEL) },
+                                    contentDescription = "Carousel View"
+                                )
+                                ViewModeIconButton(
+                                    icon = Icons.Outlined.GridView,
+                                    isSelected = uiState.displayMode == DisplayMode.GRID,
+                                    onClick = { onSetDisplayMode(DisplayMode.GRID) },
+                                    contentDescription = "Grid View"
+                                )
+                                ViewModeIconButton(
+                                    icon = Icons.Outlined.ViewList,
+                                    isSelected = uiState.displayMode == DisplayMode.LIST,
+                                    onClick = { onSetDisplayMode(DisplayMode.LIST) },
+                                    contentDescription = "List View"
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showColorPickerDialog) {
+        CustomColorPickerDialog(
+            initialColorHex = uiState.customAccentColorHex ?: "#4F46E5",
+            title = "Choose Custom Accent Color",
+            onColorSelected = { _, hex ->
+                onSetCustomAccent?.invoke(hex)
+            },
+            onDismiss = { showColorPickerDialog = false }
+        )
     }
 }
 

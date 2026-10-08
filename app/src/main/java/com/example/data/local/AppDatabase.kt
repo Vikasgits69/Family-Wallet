@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 
 @Database(
     entities = [
@@ -11,11 +12,14 @@ import androidx.room.RoomDatabase
         CreditCardEntity::class,
         DebitCardEntity::class,
         BankAccountEntity::class,
-        WalletOrGiftCardEntity::class
+        WalletOrGiftCardEntity::class,
+        DocumentEntity::class,
+        SubscriptionEntity::class
     ],
-    version = 2,
+    version = 10,
     exportSchema = false
 )
+@TypeConverters(VaultTypeConverters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun familyWalletDao(): FamilyWalletDao
