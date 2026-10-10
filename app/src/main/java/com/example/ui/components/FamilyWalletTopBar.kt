@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -35,10 +36,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.ViewCarousel
 import androidx.compose.material.icons.outlined.ViewList
+import com.example.ui.theme.EmeraldMint
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -86,7 +89,8 @@ fun FamilyWalletTopBar(
     modifier: Modifier = Modifier,
     onSetThemeMode: ((AppThemeMode) -> Unit)? = null,
     onSetCustomAccent: ((String?) -> Unit)? = null,
-    onNavigateTab: (NavigationTab) -> Unit = {}
+    onNavigateTab: (NavigationTab) -> Unit = {},
+    onOpenWifiServer: () -> Unit = {}
 ) {
     var memberDropdownExpanded by remember { mutableStateOf(false) }
     var themeDropdownExpanded by remember { mutableStateOf(false) }
@@ -278,6 +282,34 @@ fun FamilyWalletTopBar(
                                     }
                                 }
                             )
+                        }
+                    }
+
+                    // Wi-Fi Web Companion Access Button
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onOpenWifiServer()
+                        },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("wifi_companion_topbar_button")
+                    ) {
+                        Box(contentAlignment = Alignment.TopEnd) {
+                            Icon(
+                                imageVector = if (uiState.isWifiServerRunning) Icons.Default.Wifi else Icons.Default.Language,
+                                contentDescription = "Wi-Fi Web Access",
+                                tint = if (uiState.isWifiServerRunning) EmeraldMint else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            if (uiState.isWifiServerRunning) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(EmeraldMint)
+                                )
+                            }
                         }
                     }
 

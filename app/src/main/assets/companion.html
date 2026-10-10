@@ -1,0 +1,2459 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Wallet — Web Companion</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              300: '#a5b4fc',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars and transitions */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.7);
+    }
+    .card-gradient-credit {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+    }
+    .card-gradient-debit {
+      background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
+    }
+    .card-gradient-bank {
+      background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0284c7 100%);
+    }
+
+    /* ==========================================================================
+       ALL 19 HANDCRAFTED VAULT THEMES (EXACT PARITY WITH ANDROID APP)
+       ========================================================================== */
+
+    /* Default & Dark Obsidian */
+    :root, [data-theme="DARK"], [data-theme="SYSTEM"] {
+      --bg-page: #0b0f19;
+      --bg-surface: #111827;
+      --bg-surface-elevated: #1f2937;
+      --bg-surface-hover: #374151;
+      --border-subtle: #1e293b;
+      --border-card: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-color: #6366f1;
+      --accent-secondary: #06b6d4;
+      --accent-rgb: 99, 102, 241;
+      --header-bg: rgba(15, 23, 42, 0.88);
+      --input-bg: rgba(2, 6, 23, 0.75);
+    }
+
+    /* Light Contrast */
+    [data-theme="LIGHT"] {
+      --bg-page: #ffffff;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #f3f4f6;
+      --bg-surface-hover: #e5e7eb;
+      --border-subtle: #e5e7eb;
+      --border-card: #d1d5db;
+      --text-main: #000000;
+      --text-muted: #4b5563;
+      --accent-color: #1a73e8;
+      --accent-secondary: #059669;
+      --accent-rgb: 26, 115, 232;
+      --header-bg: rgba(255, 255, 255, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Pitch Black AMOLED */
+    [data-theme="PITCH_BLACK"] {
+      --bg-page: #000000;
+      --bg-surface: #050505;
+      --bg-surface-elevated: #121212;
+      --bg-surface-hover: #1c1c1c;
+      --border-subtle: #1a1a1a;
+      --border-card: #262626;
+      --text-main: #ffffff;
+      --text-muted: #a3a3a3;
+      --accent-color: #60a5fa;
+      --accent-secondary: #38bdf8;
+      --accent-rgb: 96, 165, 250;
+      --header-bg: rgba(0, 0, 0, 0.95);
+      --input-bg: #0a0a0a;
+    }
+
+    /* Emerald Vault */
+    [data-theme="EMERALD_VAULT"] {
+      --bg-page: #041712;
+      --bg-surface: #08271e;
+      --bg-surface-elevated: #0f3e31;
+      --bg-surface-hover: #134e3e;
+      --border-subtle: rgba(16, 185, 129, 0.22);
+      --border-card: rgba(16, 185, 129, 0.38);
+      --text-main: #ecfdf5;
+      --text-muted: #a7f3d0;
+      --accent-color: #10b981;
+      --accent-secondary: #f59e0b;
+      --accent-rgb: 16, 185, 129;
+      --header-bg: rgba(4, 23, 18, 0.92);
+      --input-bg: #03130e;
+    }
+
+    /* Midnight Rose */
+    [data-theme="MIDNIGHT_ROSE"] {
+      --bg-page: #0f0713;
+      --bg-surface: #190d20;
+      --bg-surface-elevated: #2b1437;
+      --bg-surface-hover: #3d1b4e;
+      --border-subtle: rgba(244, 63, 94, 0.22);
+      --border-card: rgba(244, 63, 94, 0.38);
+      --text-main: #fff1f2;
+      --text-muted: #fbcfe8;
+      --accent-color: #f43f5e;
+      --accent-secondary: #a855f7;
+      --accent-rgb: 244, 63, 94;
+      --header-bg: rgba(15, 7, 19, 0.92);
+      --input-bg: #0b050e;
+    }
+
+    /* Titanium Luxury */
+    [data-theme="PLATINUM_LUXURY"] {
+      --bg-page: #0b0d10;
+      --bg-surface: #14171c;
+      --bg-surface-elevated: #20252d;
+      --bg-surface-hover: #2d333e;
+      --border-subtle: #242b35;
+      --border-card: #3b4452;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-color: #cbd5e1;
+      --accent-secondary: #94a3b8;
+      --accent-rgb: 203, 213, 225;
+      --header-bg: rgba(11, 13, 16, 0.92);
+      --input-bg: #090a0d;
+    }
+
+    /* Swiss Gold & Onyx */
+    [data-theme="SWISS_GOLD"] {
+      --bg-page: #0a0a0a;
+      --bg-surface: #121212;
+      --bg-surface-elevated: #1e1e1e;
+      --bg-surface-hover: #292929;
+      --border-subtle: rgba(212, 175, 55, 0.25);
+      --border-card: rgba(212, 175, 55, 0.45);
+      --text-main: #faf7ee;
+      --text-muted: #d4af37;
+      --accent-color: #e5b94e;
+      --accent-secondary: #d4af37;
+      --accent-rgb: 229, 185, 78;
+      --header-bg: rgba(10, 10, 10, 0.94);
+      --input-bg: #080808;
+    }
+
+    /* Doodle Light */
+    [data-theme="DOODLE"] {
+      --bg-page: #fffdf8;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #fff8e7;
+      --bg-surface-hover: #fef0cd;
+      --border-subtle: #f3e8d2;
+      --border-card: #e5d7bd;
+      --text-main: #22223b;
+      --text-muted: #4a4e69;
+      --accent-color: #e11d48;
+      --accent-secondary: #2563eb;
+      --accent-rgb: 225, 29, 72;
+      --header-bg: rgba(255, 253, 248, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Doodle Dark */
+    [data-theme="DOODLE_DARK"] {
+      --bg-page: #181926;
+      --bg-surface: #222436;
+      --bg-surface-elevated: #2d304b;
+      --bg-surface-hover: #3c4064;
+      --border-subtle: #343750;
+      --border-card: #494d64;
+      --text-main: #cad3f5;
+      --text-muted: #939ab7;
+      --accent-color: #f43f5e;
+      --accent-secondary: #38bdf8;
+      --accent-rgb: 244, 63, 94;
+      --header-bg: rgba(24, 25, 38, 0.92);
+      --input-bg: #141520;
+    }
+
+    /* Paperlike Parchment */
+    [data-theme="PAPERLIKE"] {
+      --bg-page: #faf7f2;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #f3efea;
+      --bg-surface-hover: #e8e2d8;
+      --border-subtle: #ece5dc;
+      --border-card: #e0d7cb;
+      --text-main: #262626;
+      --text-muted: #57534e;
+      --accent-color: #b45309;
+      --accent-secondary: #059669;
+      --accent-rgb: 180, 83, 9;
+      --header-bg: rgba(250, 247, 242, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Warm Espresso */
+    [data-theme="WARM_ESPRESSO"] {
+      --bg-page: #fbf8f5;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #f3ede7;
+      --bg-surface-hover: #e6ded5;
+      --border-subtle: #ebdcd3;
+      --border-card: #d7ccc8;
+      --text-main: #2a1f1d;
+      --text-muted: #5d4037;
+      --accent-color: #6f4e37;
+      --accent-secondary: #8d6e63;
+      --accent-rgb: 111, 78, 55;
+      --header-bg: rgba(251, 248, 245, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Sakura Blossom */
+    [data-theme="SAKURA_BLOSSOM"] {
+      --bg-page: #fff7f9;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #fde8ef;
+      --bg-surface-hover: #fad2df;
+      --border-subtle: #fce7f3;
+      --border-card: #fbcfe8;
+      --text-main: #280b16;
+      --text-muted: #6b213d;
+      --accent-color: #e11d74;
+      --accent-secondary: #9d174d;
+      --accent-rgb: 225, 29, 116;
+      --header-bg: rgba(255, 247, 249, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Cyber Neon */
+    [data-theme="CYBER_NEON"] {
+      --bg-page: #060814;
+      --bg-surface: #0b0f24;
+      --bg-surface-elevated: #131a3e;
+      --bg-surface-hover: #1e285a;
+      --border-subtle: rgba(0, 245, 255, 0.25);
+      --border-card: rgba(0, 245, 255, 0.45);
+      --text-main: #e0f7fa;
+      --text-muted: #80deea;
+      --accent-color: #00f5ff;
+      --accent-secondary: #d946ef;
+      --accent-rgb: 0, 245, 255;
+      --header-bg: rgba(6, 8, 20, 0.92);
+      --input-bg: #04050d;
+    }
+
+    /* Nordic Frost */
+    [data-theme="NORDIC_FROST"] {
+      --bg-page: #f0f4f8;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #e2e8f0;
+      --bg-surface-hover: #cbd5e1;
+      --border-subtle: #e2e8f0;
+      --border-card: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --accent-color: #0284c7;
+      --accent-secondary: #0ea5e9;
+      --accent-rgb: 2, 132, 199;
+      --header-bg: rgba(240, 244, 248, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Sunset Amber */
+    [data-theme="SUNSET_AMBER"] {
+      --bg-page: #faf5ee;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #f5ebe1;
+      --bg-surface-hover: #ebdccf;
+      --border-subtle: #f0eae1;
+      --border-card: #e7dfd5;
+      --text-main: #292524;
+      --text-muted: #57534e;
+      --accent-color: #ea580c;
+      --accent-secondary: #d97706;
+      --accent-rgb: 234, 88, 12;
+      --header-bg: rgba(250, 245, 238, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Matcha & Sage */
+    [data-theme="MATCHA_SAGE"] {
+      --bg-page: #f7f8f2;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #ebf0e1;
+      --bg-surface-hover: #dce5cf;
+      --border-subtle: #e8eee0;
+      --border-card: #dde5d3;
+      --text-main: #1c1d18;
+      --text-muted: #4b553d;
+      --accent-color: #4d7c0f;
+      --accent-secondary: #65a30d;
+      --accent-rgb: 77, 124, 15;
+      --header-bg: rgba(247, 248, 242, 0.95);
+      --input-bg: #ffffff;
+    }
+
+    /* Retro 80s CRT */
+    [data-theme="RETRO_TERMINAL"] {
+      --bg-page: #030a05;
+      --bg-surface: #06140a;
+      --bg-surface-elevated: #0b2312;
+      --bg-surface-hover: #10331b;
+      --border-subtle: rgba(34, 197, 94, 0.25);
+      --border-card: rgba(34, 197, 94, 0.45);
+      --text-main: #dcfce7;
+      --text-muted: #4ade80;
+      --accent-color: #22c55e;
+      --accent-secondary: #f59e0b;
+      --accent-rgb: 34, 197, 94;
+      --header-bg: rgba(3, 10, 5, 0.94);
+      --input-bg: #020703;
+    }
+
+    /* High Contrast WCAG AAA */
+    [data-theme="HIGH_CONTRAST"] {
+      --bg-page: #000000;
+      --bg-surface: #000000;
+      --bg-surface-elevated: #151515;
+      --bg-surface-hover: #262626;
+      --border-subtle: #555555;
+      --border-card: #ffff00;
+      --text-main: #ffffff;
+      --text-muted: #00ffff;
+      --accent-color: #ffff00;
+      --accent-secondary: #00ffff;
+      --accent-rgb: 255, 255, 0;
+      --header-bg: #000000;
+      --input-bg: #000000;
+    }
+
+    /* ==========================================================================
+       GUARANTEED CRISP PURE WHITE TEXT ON ALL FINANCIAL CARDS & HERO BANNER
+       ========================================================================== */
+    .payment-card,
+    .payment-card *,
+    .card-gradient-credit,
+    .card-gradient-credit *,
+    .card-gradient-debit,
+    .card-gradient-debit *,
+    .card-gradient-bank,
+    .card-gradient-bank *,
+    .hero-banner,
+    .hero-banner * {
+      color: #ffffff !important;
+    }
+
+    .payment-card .card-muted,
+    .payment-card .opacity-60,
+    .card-gradient-credit .opacity-60,
+    .card-gradient-debit .opacity-60,
+    .card-gradient-bank .opacity-60,
+    .hero-banner .hero-muted {
+      color: rgba(255, 255, 255, 0.78) !important;
+      opacity: 0.9 !important;
+    }
+
+    .payment-card .card-subtext,
+    .payment-card .opacity-75,
+    .card-gradient-credit .opacity-75,
+    .card-gradient-debit .opacity-75,
+    .card-gradient-bank .opacity-75 {
+      color: rgba(255, 255, 255, 0.92) !important;
+    }
+
+    .hero-banner button {
+      background-color: rgba(255, 255, 255, 0.16) !important;
+      border: 1px solid rgba(255, 255, 255, 0.35) !important;
+      color: #ffffff !important;
+    }
+    .hero-banner button:hover {
+      background-color: rgba(255, 255, 255, 0.28) !important;
+    }
+
+    /* ==========================================================================
+       THEME APPLICATION SYSTEM (CLEAN, POLISHED, NO GLITCHES)
+       ========================================================================== */
+    body {
+      background-color: var(--bg-page) !important;
+      color: var(--text-main) !important;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    header {
+      background-color: var(--header-bg) !important;
+      border-color: var(--border-subtle) !important;
+    }
+
+    /* Modals & Surfaces */
+    .theme-modal-box {
+      background-color: var(--bg-surface) !important;
+      border: 1px solid var(--border-card) !important;
+    }
+
+    .theme-item-card {
+      background-color: var(--bg-surface-elevated) !important;
+      border: 1px solid var(--border-card) !important;
+      color: var(--text-main) !important;
+    }
+    .theme-item-card:hover {
+      background-color: var(--bg-surface-hover) !important;
+    }
+    .theme-item-card.is-active {
+      border: 2px solid var(--accent-color) !important;
+      box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.25) !important;
+    }
+    .theme-item-card h4 {
+      color: var(--text-main) !important;
+    }
+    .theme-item-card p, .theme-item-card span {
+      color: var(--text-muted) !important;
+    }
+
+    .theme-tab.active {
+      background-color: var(--accent-color) !important;
+      color: #ffffff !important;
+    }
+
+    /* General Containers (non-card, non-hero) */
+    html.light body .bg-slate-900:not(.hero-banner):not(.payment-card):not(.card-gradient-credit):not(.card-gradient-debit):not(.card-gradient-bank),
+    html.light body .bg-slate-900\/50:not(.hero-banner):not(.payment-card):not(.card-gradient-credit):not(.card-gradient-debit):not(.card-gradient-bank),
+    html.light body .bg-slate-900\/60:not(.hero-banner):not(.payment-card):not(.card-gradient-credit):not(.card-gradient-debit):not(.card-gradient-bank),
+    html.light body .bg-slate-900\/80:not(.hero-banner):not(.payment-card):not(.card-gradient-credit):not(.card-gradient-debit):not(.card-gradient-bank),
+    html.light body .bg-slate-900\/90:not(.hero-banner):not(.payment-card):not(.card-gradient-credit):not(.card-gradient-debit):not(.card-gradient-bank) {
+      background-color: var(--bg-surface) !important;
+      border-color: var(--border-card) !important;
+    }
+
+    html.light body .bg-slate-800:not(.hero-banner):not(.payment-card),
+    html.light body .bg-slate-800\/50:not(.hero-banner):not(.payment-card),
+    html.light body .bg-slate-800\/60:not(.hero-banner):not(.payment-card) {
+      background-color: var(--bg-surface-elevated) !important;
+      border-color: var(--border-card) !important;
+    }
+
+    html.light body .bg-slate-950:not(.hero-banner):not(.payment-card),
+    html.light body .bg-slate-950\/60:not(.hero-banner):not(.payment-card),
+    html.light body .bg-slate-950\/70:not(.hero-banner):not(.payment-card) {
+      background-color: var(--input-bg) !important;
+      border-color: var(--border-card) !important;
+      color: var(--text-main) !important;
+    }
+
+    /* Text on light mode (never touching payment cards or hero banner) */
+    html.light body h1:not(.payment-card *):not(.hero-banner *),
+    html.light body h2:not(.payment-card *):not(.hero-banner *),
+    html.light body h3:not(.payment-card *):not(.hero-banner *),
+    html.light body h4:not(.payment-card *):not(.hero-banner *),
+    html.light body .text-slate-200:not(.payment-card *):not(.hero-banner *) {
+      color: var(--text-main) !important;
+    }
+
+    html.light body .text-slate-400:not(.payment-card *):not(.hero-banner *):not(.theme-tab.active),
+    html.light body .text-slate-500:not(.payment-card *):not(.hero-banner *) {
+      color: var(--text-muted) !important;
+    }
+
+    html.light body .border-slate-800:not(.payment-card):not(.hero-banner),
+    html.light body .border-slate-800\/80:not(.payment-card):not(.hero-banner),
+    html.light body .border-slate-700:not(.payment-card):not(.hero-banner) {
+      border-color: var(--border-card) !important;
+    }
+
+    /* Buttons */
+    button.bg-indigo-600:not(.hero-banner *):not(.payment-card *), .btn-primary {
+      background-color: var(--accent-color) !important;
+      color: #ffffff !important;
+    }
+
+    [data-theme="HIGH_CONTRAST"] button.bg-indigo-600 {
+      color: #000000 !important;
+      font-weight: 800 !important;
+    }
+
+    .text-indigo-400 {
+      color: var(--accent-color) !important;
+    }
+
+    /* Retro Terminal */
+    [data-theme="RETRO_TERMINAL"] {
+      font-family: '"JetBrains Mono"', monospace !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-200">
+
+  <!-- PIN Security Overlay (if PIN is required) -->
+  <div id="pinOverlay" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-5">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+        <i data-lucide="shield-alert" class="w-7 h-7"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Vault Pairing Required</h2>
+        <p class="text-xs text-slate-400 mt-1">Enter the 4-digit Web Access PIN shown in your Android app to unlock.</p>
+      </div>
+      <div>
+        <input type="password" id="pinInput" maxlength="6" placeholder="• • • •"
+               class="w-full text-center text-2xl tracking-[0.5em] font-mono py-3 px-4 bg-slate-950 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-white placeholder-slate-600" />
+        <p id="pinError" class="text-xs text-rose-400 mt-2 hidden">Incorrect PIN. Check the code in your phone's Wi-Fi dialog.</p>
+      </div>
+      <button onclick="submitPin()" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2">
+        <i data-lucide="unlock" class="w-4 h-4"></i>
+        <span>Unlock Web Companion</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-md pointer-events-none"></div>
+
+  <!-- Top Sticky Header -->
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- App Brand -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+          <i data-lucide="wallet" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-base tracking-tight text-white">Family Wallet</span>
+            <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Web Portal</span>
+          </div>
+          <p class="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="headerSyncText">Live Wi-Fi Sync Active</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="flex-1 max-w-md hidden md:block">
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+          <input type="text" id="globalSearchInput" oninput="handleSearch(this.value)" placeholder="Search cards, banks, wallets, family..."
+                 class="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all" />
+        </div>
+      </div>
+
+      <!-- Header Actions -->
+      <div class="flex items-center gap-2">
+        <!-- Manual Sync Button -->
+        <button onclick="fetchVaultData(true)" title="Force sync from phone" class="p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition flex items-center gap-1 text-xs">
+          <i data-lucide="refresh-cw" id="syncIcon" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Sync Now</span>
+        </button>
+
+        <!-- New Item Dropdown -->
+        <div class="relative">
+          <button onclick="toggleNewMenu()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add New</span>
+            <i data-lucide="chevron-down" class="w-3 h-3"></i>
+          </button>
+          <div id="newMenuDropdown" class="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-1 text-xs hidden z-50">
+            <button onclick="openAddCardModal('CREDIT')" class="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-200 flex items-center gap-2">
+              <i data-lucide="credit-card" class="w-4 h-4 text-indigo-400"></i> Credit Card
+            </button>
+            <button onclick="openAddCardModal('DEBIT')" class="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-200 flex items-center gap-2">
+              <i data-lucide="credit-card" class="w-4 h-4 text-emerald-400"></i> Debit Card
+            </button>
+            <button onclick="openAddBankModal()" class="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-200 flex items-center gap-2">
+              <i data-lucide="landmark" class="w-4 h-4 text-cyan-400"></i> Bank Account
+            </button>
+            <button onclick="openAddWalletModal()" class="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-200 flex items-center gap-2">
+              <i data-lucide="wallet-cards" class="w-4 h-4 text-amber-400"></i> Wallet / Gift Card
+            </button>
+            <button onclick="openAddMemberModal()" class="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-200 flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-purple-400"></i> Family Member
+            </button>
+            <button onclick="openAddDocModal()" class="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-200 flex items-center gap-2">
+              <i data-lucide="file-text" class="w-4 h-4 text-rose-400"></i> Document
+            </button>
+          </div>
+        </div>
+
+        <!-- Theme Selector Button -->
+        <button onclick="openThemeModal()" id="themeHeaderBtn" title="Change Theme (Synced with Android app)" class="px-2.5 py-2 text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl transition flex items-center gap-1.5 text-xs font-medium">
+          <span id="headerThemeEmoji" class="text-sm">🌙</span>
+          <span id="headerThemeTitle" class="hidden sm:inline text-xs font-semibold">Dark Obsidian</span>
+          <i data-lucide="palette" class="w-3.5 h-3.5 text-indigo-400"></i>
+        </button>
+
+        <!-- Global Mask Toggle -->
+        <button onclick="toggleGlobalMask()" id="maskToggleBtn" title="Toggle Number Masking" class="p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition">
+          <i data-lucide="eye-off" id="maskToggleIcon" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Search Bar (small screens) -->
+  <div class="p-4 md:hidden border-b border-slate-800 bg-slate-900/40">
+    <div class="relative">
+      <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+      <input type="text" oninput="handleSearch(this.value)" placeholder="Search cards, banks, wallets, family..."
+             class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col md:flex-row gap-6">
+
+    <!-- Navigation Sidebar -->
+    <aside class="w-full md:w-56 shrink-0 flex flex-row md:flex-col gap-1 overflow-x-auto pb-2 md:pb-0">
+      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn active flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition text-indigo-400 bg-indigo-500/10 border border-indigo-500/20">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+        <span>Dashboard</span>
+      </button>
+      <button onclick="switchTab('cards')" id="nav-cards" class="nav-btn flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="credit-card" class="w-4 h-4"></i>
+          <span>Cards</span>
+        </div>
+        <span id="badgeCards" class="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-300 font-mono">0</span>
+      </button>
+      <button onclick="switchTab('banks')" id="nav-banks" class="nav-btn flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="landmark" class="w-4 h-4"></i>
+          <span>Bank Accounts</span>
+        </div>
+        <span id="badgeBanks" class="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-300 font-mono">0</span>
+      </button>
+      <button onclick="switchTab('wallets')" id="nav-wallets" class="nav-btn flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="wallet-cards" class="w-4 h-4"></i>
+          <span>Wallets & Gifts</span>
+        </div>
+        <span id="badgeWallets" class="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-300 font-mono">0</span>
+      </button>
+      <button onclick="switchTab('members')" id="nav-members" class="nav-btn flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Family</span>
+        </div>
+        <span id="badgeMembers" class="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-300 font-mono">0</span>
+      </button>
+      <button onclick="switchTab('docs')" id="nav-docs" class="nav-btn flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>Documents</span>
+        </div>
+        <span id="badgeDocs" class="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-300 font-mono">0</span>
+      </button>
+
+      <!-- Theme Switcher Sidebar Link -->
+      <button onclick="openThemeModal()" id="nav-themes" class="nav-btn flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="palette" class="w-4 h-4 text-violet-400"></i>
+          <span>Theme Styles</span>
+        </div>
+        <span class="px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono">19</span>
+      </button>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 min-w-0 space-y-6">
+
+      <!-- KPI Summary Cards (always at top) -->
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Stat 1: Total Assets -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400">Total Assets</span>
+            <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiTotalAssets" class="text-2xl font-bold font-mono text-white tabular-nums">0</span>
+            <span class="text-[10px] text-emerald-400 font-medium">Secured in Vault</span>
+          </div>
+        </div>
+
+        <!-- Stat 2: Active Cards -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400">Payment Cards</span>
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+              <i data-lucide="credit-card" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiCards" class="text-2xl font-bold font-mono text-white tabular-nums">0</span>
+            <span class="text-[10px] text-slate-400">Credit & Debit</span>
+          </div>
+        </div>
+
+        <!-- Stat 3: Bank Accounts -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400">Bank Accounts</span>
+            <div class="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+              <i data-lucide="landmark" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiBanks" class="text-2xl font-bold font-mono text-white tabular-nums">0</span>
+            <span class="text-[10px] text-slate-400">Savings & Current</span>
+          </div>
+        </div>
+
+        <!-- Stat 4: Wallets & Balance -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400">Wallets & Gifts</span>
+            <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+              <i data-lucide="wallet-cards" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiWallets" class="text-2xl font-bold font-mono text-white tabular-nums">0</span>
+            <span id="kpiWalletBalance" class="text-[10px] text-amber-400 font-mono font-medium">₹0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: DASHBOARD -->
+      <section id="tab-dashboard" class="tab-content space-y-6">
+        <!-- Quick Action & Phone Sync Banner -->
+        <div class="hero-banner bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/30 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">TWO-WAY WI-FI SYNC</span>
+              <span class="text-xs text-slate-300 hero-muted" id="syncStatusDetailed">Syncing with Android phone</span>
+            </div>
+            <h3 class="text-base font-bold text-white">Full Vault Access on Big Screen</h3>
+            <p class="text-xs text-slate-300 hero-muted">Any addition or edit made here updates your phone in real time, and vice versa!</p>
+          </div>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button onclick="openAddCardModal('CREDIT')" class="flex-1 sm:flex-initial px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-sm">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Card
+            </button>
+            <button onclick="openAddBankModal()" class="flex-1 sm:flex-initial px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-sm">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Bank
+            </button>
+          </div>
+        </div>
+
+        <!-- Dashboard Recent Cards & Accounts Split -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Recent Cards Box -->
+          <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="credit-card" class="w-4 h-4 text-indigo-400"></i>
+                <span>Credit & Debit Cards</span>
+              </h3>
+              <button onclick="switchTab('cards')" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">View all</button>
+            </div>
+            <div id="dashboardCardsList" class="space-y-3">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Recent Bank Accounts Box -->
+          <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="landmark" class="w-4 h-4 text-cyan-400"></i>
+                <span>Bank Accounts</span>
+              </h3>
+              <button onclick="switchTab('banks')" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">View all</button>
+            </div>
+            <div id="dashboardBanksList" class="space-y-3">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CARDS -->
+      <section id="tab-cards" class="tab-content hidden space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-white">Payment Cards</h2>
+            <p class="text-xs text-slate-400">Manage all family credit and debit cards with security details</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="openAddCardModal('CREDIT')" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow transition flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Credit Card
+            </button>
+            <button onclick="openAddCardModal('DEBIT')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow transition flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Debit Card
+            </button>
+          </div>
+        </div>
+
+        <!-- Cards Grid -->
+        <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- TAB: BANKS -->
+      <section id="tab-banks" class="tab-content hidden space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-white">Bank Accounts</h2>
+            <p class="text-xs text-slate-400">Savings, Current, and Salary accounts with IFSC and branch codes</p>
+          </div>
+          <button onclick="openAddBankModal()" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold shadow transition flex items-center gap-1.5">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Bank Account
+          </button>
+        </div>
+
+        <div id="banksList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- TAB: WALLETS -->
+      <section id="tab-wallets" class="tab-content hidden space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-white">Wallets & Gift Cards</h2>
+            <p class="text-xs text-slate-400">Digital wallet UPI IDs and brand gift vouchers with balances and PINs</p>
+          </div>
+          <button onclick="openAddWalletModal()" class="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold shadow transition flex items-center gap-1.5">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Wallet / Voucher
+          </button>
+        </div>
+
+        <div id="walletsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- TAB: FAMILY MEMBERS -->
+      <section id="tab-members" class="tab-content hidden space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-white">Family Profiles</h2>
+            <p class="text-xs text-slate-400">Family members, relationships, and emergency contact details</p>
+          </div>
+          <button onclick="openAddMemberModal()" class="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow transition flex items-center gap-1.5">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Family Member
+          </button>
+        </div>
+
+        <div id="membersList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- TAB: DOCUMENTS -->
+      <section id="tab-docs" class="tab-content hidden space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-white">Personal Documents & IDs</h2>
+            <p class="text-xs text-slate-400">Aadhaar, PAN, Passport, Driving License, and Insurance</p>
+          </div>
+          <button onclick="openAddDocModal()" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold shadow transition flex items-center gap-1.5">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Document
+          </button>
+        </div>
+
+        <div id="docsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 py-4 px-6 text-center text-xs text-slate-500 bg-slate-950">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span>Local Wi-Fi Companion — Zero External Cloud Dependency</span>
+      </div>
+      <p>Data stored locally in SQLite / Room on your Android device.</p>
+    </div>
+  </footer>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- ADD / EDIT CARD MODAL -->
+  <div id="cardModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="cardModalTitle" class="text-base font-bold text-white">Add Card</h3>
+        <button onclick="closeModal('cardModal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="cardForm" onsubmit="handleSaveCard(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="cardFormId" />
+        <input type="hidden" id="cardFormType" value="CREDIT" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Bank Name</label>
+            <input type="text" id="cardBankName" required placeholder="e.g. HDFC Bank, SBI" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Card Name / Nickname</label>
+            <input type="text" id="cardCardName" required placeholder="e.g. Regalia Gold" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Cardholder Name</label>
+            <input type="text" id="cardHolderName" required placeholder="Name on card" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Card Network</label>
+            <select id="cardNetwork" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <option value="VISA">Visa</option>
+              <option value="MASTERCARD">Mastercard</option>
+              <option value="RUPAY">RuPay</option>
+              <option value="AMEX">American Express</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Card Number (16 digits)</label>
+          <input type="text" id="cardNumber" required placeholder="4000 1234 5678 9010" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Expiry (MM/YY)</label>
+            <input type="text" id="cardExpiry" required placeholder="12/28" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">CVV / CVC</label>
+            <input type="password" id="cardCvv" required maxlength="4" placeholder="•••" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <!-- Optional fields for billing / limits -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Bill / Statement Date</label>
+            <input type="text" id="cardStatementDate" placeholder="e.g. 15th" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Payment Due Date</label>
+            <input type="text" id="cardDueDate" placeholder="e.g. 5th" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Assign to Family Member</label>
+          <select id="cardMemberSelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <option value="">Personal / Unassigned</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('cardModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold">Save to Vault</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT BANK MODAL -->
+  <div id="bankModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="bankModalTitle" class="text-base font-bold text-white">Add Bank Account</h3>
+        <button onclick="closeModal('bankModal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="bankForm" onsubmit="handleSaveBank(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="bankFormId" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Bank Name</label>
+            <input type="text" id="bankNameInput" required placeholder="e.g. State Bank of India" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Account Type</label>
+            <select id="bankTypeInput" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500">
+              <option value="Savings">Savings Account</option>
+              <option value="Current">Current Account</option>
+              <option value="Salary">Salary Account</option>
+              <option value="Fixed Deposit">Fixed Deposit</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Account Holder Name</label>
+          <input type="text" id="bankHolderInput" required placeholder="Full Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Account Number</label>
+            <input type="text" id="bankNumberInput" required placeholder="Account digits" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">IFSC Code</label>
+            <input type="text" id="bankIfscInput" required placeholder="e.g. SBIN0001234" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono uppercase text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Branch Name</label>
+          <input type="text" id="bankBranchInput" placeholder="e.g. Connaught Place Branch" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" />
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Assign to Family Member</label>
+          <select id="bankMemberSelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500">
+            <option value="">Personal / Unassigned</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('bankModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-semibold">Save Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT WALLET / GIFT CARD MODAL -->
+  <div id="walletModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="walletModalTitle" class="text-base font-bold text-white">Add Wallet or Gift Card</h3>
+        <button onclick="closeModal('walletModal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="walletForm" onsubmit="handleSaveWallet(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="walletFormId" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Item Type</label>
+            <select id="walletIsGiftCard" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
+              <option value="false">Online Wallet / UPI</option>
+              <option value="true">Gift Voucher / Card</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Provider or Brand</label>
+            <input type="text" id="walletProvider" required placeholder="e.g. Amazon, Paytm, Apple" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-amber-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">UPI ID or Card / Voucher Code</label>
+            <input type="text" id="walletNumber" required placeholder="e.g. username@okhdfcbank" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-amber-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Gift Card PIN (if applicable)</label>
+            <input type="password" id="walletPin" placeholder="Voucher PIN" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-amber-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Current Balance (₹)</label>
+            <input type="number" id="walletAmount" step="any" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-amber-500" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Expiry Date</label>
+            <input type="text" id="walletExpiry" placeholder="e.g. 31/12/2026" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-amber-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Assign to Family Member</label>
+          <select id="walletMemberSelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-amber-500">
+            <option value="">Personal / Unassigned</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('walletModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-semibold">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT FAMILY MEMBER MODAL -->
+  <div id="memberModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="memberModalTitle" class="text-base font-bold text-white">Add Family Member</h3>
+        <button onclick="closeModal('memberModal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="memberForm" onsubmit="handleSaveMember(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="memberFormId" />
+
+        <div>
+          <label class="block text-slate-400 mb-1">Member Name</label>
+          <input type="text" id="memberNameInput" required placeholder="e.g. John Doe" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-purple-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Relationship</label>
+            <select id="memberRelCategory" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
+              <option value="SELF">Self</option>
+              <option value="SPOUSE">Spouse</option>
+              <option value="MOTHER">Mother</option>
+              <option value="FATHER">Father</option>
+              <option value="BROTHER">Brother</option>
+              <option value="SISTER">Sister</option>
+              <option value="OTHERS">Others</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Blood Group</label>
+            <input type="text" id="memberBloodGroup" placeholder="e.g. O+" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-purple-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Emergency Phone Number</label>
+          <input type="tel" id="memberPhone" placeholder="+91 98765 43210" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-purple-500" />
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="memberIsEmergency" class="rounded bg-slate-950 border-slate-700 text-purple-600 focus:ring-purple-500" />
+          <label for="memberIsEmergency" class="text-slate-300">Designate as Emergency ICE Contact</label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('memberModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-semibold">Save Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT DOCUMENT MODAL -->
+  <div id="docModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="docModalTitle" class="text-base font-bold text-white">Add Document</h3>
+        <button onclick="closeModal('docModal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="docForm" onsubmit="handleSaveDoc(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="docFormId" />
+
+        <div>
+          <label class="block text-slate-400 mb-1">Document Title</label>
+          <input type="text" id="docTitleInput" required placeholder="e.g. Aadhaar Card, Passport" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-rose-500" />
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Document / ID Number</label>
+          <input type="text" id="docNumberInput" required placeholder="Number or Identifier" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:ring-1 focus:ring-rose-500" />
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Assign to Family Member</label>
+          <select id="docMemberSelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-rose-500">
+            <option value="">Personal / Unassigned</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Notes / PDF Password (optional)</label>
+          <input type="text" id="docNotesInput" placeholder="Special remarks or password" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-rose-500" />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('docModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-semibold">Save Document</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRMATION MODAL -->
+  <div id="deleteModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+      <div class="w-12 h-12 mx-auto rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400">
+        <i data-lucide="trash-2" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-white">Delete Item</h3>
+        <p class="text-xs text-slate-400 mt-1" id="deletePrompt">Are you sure you want to remove this from your vault?</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeModal('deleteModal')" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl font-medium">Cancel</button>
+        <button id="confirmDeleteBtn" class="flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs rounded-xl font-semibold">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- THEME SELECTOR MODAL -->
+  <div id="themeModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="theme-modal-box bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col overflow-hidden">
+      <!-- Modal Header (shrink-0) -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <i data-lucide="palette" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <span>Web Companion Themes</span>
+            </h3>
+            <p class="text-xs text-slate-400">Choose from all 19 handcrafted themes. Changes apply to this browser view.</p>
+          </div>
+        </div>
+        <button onclick="closeModal('themeModal')" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Category Filter Tabs (shrink-0, no overflow squish) -->
+      <div class="flex gap-2 overflow-x-auto py-2 shrink-0 text-xs border-b border-slate-800/80 items-center" id="themeCategoryTabs">
+        <button onclick="filterThemes('ALL')" class="theme-tab active shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-xl font-medium transition bg-indigo-600 text-white" data-cat="ALL">All (19)</button>
+        <button onclick="filterThemes('CORE')" class="theme-tab shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-xl font-medium transition text-slate-400 hover:text-white hover:bg-slate-800" data-cat="CORE">Core (4)</button>
+        <button onclick="filterThemes('LUXURY')" class="theme-tab shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-xl font-medium transition text-slate-400 hover:text-white hover:bg-slate-800" data-cat="LUXURY">Luxury (4)</button>
+        <button onclick="filterThemes('ARTISTIC')" class="theme-tab shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-xl font-medium transition text-slate-400 hover:text-white hover:bg-slate-800" data-cat="ARTISTIC">Artistic (5)</button>
+        <button onclick="filterThemes('VIBE')" class="theme-tab shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-xl font-medium transition text-slate-400 hover:text-white hover:bg-slate-800" data-cat="VIBE">Modern & Moods (6)</button>
+      </div>
+
+      <!-- Themes Grid (flex-1, scrollable) -->
+      <div class="overflow-y-auto pr-1 flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-[300px]" id="themeGridContainer">
+        <!-- Rendered dynamically by renderThemes() -->
+      </div>
+
+      <!-- Footer (shrink-0) -->
+      <div class="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+        <div class="flex items-center gap-1.5">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>Theme saved for this web browser view</span>
+        </div>
+        <button onclick="closeModal('themeModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CLIENT JAVASCRIPT ==================== -->
+  <script>
+    // State management
+    let vaultState = {
+      members: [],
+      creditCards: [],
+      debitCards: [],
+      bankAccounts: [],
+      walletsAndGiftCards: [],
+      documents: [],
+      subscriptions: []
+    };
+    let serverVersion = 0;
+    let isMasked = true;
+    let searchQuery = '';
+    let currentTab = 'dashboard';
+    let pollInterval = null;
+    let authToken = sessionStorage.getItem('vault_auth_token') || '';
+    let currentThemeId = localStorage.getItem('vault_web_theme') || 'DARK';
+    let currentThemeCategoryFilter = 'ALL';
+
+    // All 19 themes matching Android app exactly
+    const ALL_THEMES = [
+      // CORE
+      { id: 'SYSTEM', title: 'System Default', subtitle: 'Follow Android system dark/light mode', emoji: '⚙️', category: 'CORE', categoryTitle: 'Core', isDark: true, colors: ['#6366f1', '#06b6d4', '#0b0f19', '#111827'] },
+      { id: 'DARK', title: 'Dark Obsidian', subtitle: 'Midnight slate with tonal elevation & indigo', emoji: '🌙', category: 'CORE', categoryTitle: 'Core', isDark: true, colors: ['#6366f1', '#06b6d4', '#0b0f19', '#111827'] },
+      { id: 'LIGHT', title: 'Light Contrast', subtitle: 'Crisp stark white & high contrast black text', emoji: '☀️', category: 'CORE', categoryTitle: 'Core', isDark: false, colors: ['#1a73e8', '#059669', '#ffffff', '#f3f4f6'] },
+      { id: 'PITCH_BLACK', title: 'Pitch Black', subtitle: 'Pure AMOLED deep black #000000', emoji: '🖤', category: 'CORE', categoryTitle: 'Core', isDark: true, colors: ['#60a5fa', '#38bdf8', '#000000', '#121212'] },
+
+      // LUXURY
+      { id: 'EMERALD_VAULT', title: 'Emerald Vault', subtitle: 'Swiss private banking, jade & gold accents', emoji: '🌲', category: 'LUXURY', categoryTitle: 'Luxury', isDark: true, colors: ['#10b981', '#f59e0b', '#041712', '#08271e'] },
+      { id: 'MIDNIGHT_ROSE', title: 'Midnight Rose', subtitle: 'Plum velvet with electric rose & amethyst', emoji: '🌹', category: 'LUXURY', categoryTitle: 'Luxury', isDark: true, colors: ['#f43f5e', '#a855f7', '#0f0713', '#190d20'] },
+      { id: 'PLATINUM_LUXURY', title: 'Titanium Luxury', subtitle: 'Matte gunmetal, titanium gray & chrome', emoji: '💎', category: 'LUXURY', categoryTitle: 'Luxury', isDark: true, colors: ['#cbd5e1', '#94a3b8', '#0b0d10', '#14171c'] },
+      { id: 'SWISS_GOLD', title: 'Swiss Gold & Onyx', subtitle: 'Bespoke private bank 24k gold on pitch obsidian', emoji: '🪙', category: 'LUXURY', categoryTitle: 'Luxury', isDark: true, colors: ['#e5b94e', '#d4af37', '#0a0a0a', '#121212'] },
+
+      // ARTISTIC
+      { id: 'DOODLE', title: 'Doodle Light', subtitle: 'Hand-drawn playful notebook & pastel markers', emoji: '🎨', category: 'ARTISTIC', categoryTitle: 'Artistic', isDark: false, colors: ['#e11d48', '#2563eb', '#fffdf8', '#fff8e7'] },
+      { id: 'DOODLE_DARK', title: 'Doodle Dark', subtitle: 'Chalkboard & neon gel pens on slate', emoji: '✏️', category: 'ARTISTIC', categoryTitle: 'Artistic', isDark: true, colors: ['#f43f5e', '#38bdf8', '#181926', '#222436'] },
+      { id: 'PAPERLIKE', title: 'Paperlike', subtitle: 'Warm cream editorial Notion parchment', emoji: '📜', category: 'ARTISTIC', categoryTitle: 'Artistic', isDark: false, colors: ['#b45309', '#059669', '#faf7f2', '#f3efea'] },
+      { id: 'WARM_ESPRESSO', title: 'Warm Espresso', subtitle: 'Cozy roasted coffee, oat milk cream & hazelnut', emoji: '☕', category: 'ARTISTIC', categoryTitle: 'Artistic', isDark: false, colors: ['#6f4e37', '#8d6e63', '#fbf8f5', '#f3ede7'] },
+      { id: 'SAKURA_BLOSSOM', title: 'Sakura Blossom', subtitle: 'Japanese cherry blossom blush, cream & plum', emoji: '🌸', category: 'ARTISTIC', categoryTitle: 'Artistic', isDark: false, colors: ['#e11d74', '#9d174d', '#fff7f9', '#fde8ef'] },
+
+      // MODERN & MOODS (VIBE)
+      { id: 'CYBER_NEON', title: 'Cyber Neon', subtitle: 'Synthwave cosmic navy with glowing cyan & purple', emoji: '🌌', category: 'VIBE', categoryTitle: 'Modern & Moods', isDark: true, colors: ['#00f5ff', '#d946ef', '#060814', '#0b0f24'] },
+      { id: 'NORDIC_FROST', title: 'Nordic Frost', subtitle: 'Minimalist arctic glacial blue & ice slate', emoji: '❄️', category: 'VIBE', categoryTitle: 'Modern & Moods', isDark: false, colors: ['#0284c7', '#0ea5e9', '#f0f4f8', '#e2e8f0'] },
+      { id: 'SUNSET_AMBER', title: 'Sunset Amber', subtitle: 'Warm terracotta copper, sand & desert gold', emoji: '🌇', category: 'VIBE', categoryTitle: 'Modern & Moods', isDark: false, colors: ['#ea580c', '#d97706', '#faf5ee', '#f5ebe1'] },
+      { id: 'MATCHA_SAGE', title: 'Matcha & Sage', subtitle: 'Soothing calm organic herbal tea & olive', emoji: '🍵', category: 'VIBE', categoryTitle: 'Modern & Moods', isDark: false, colors: ['#4d7c0f', '#65a30d', '#f7f8f2', '#ebf0e1'] },
+      { id: 'RETRO_TERMINAL', title: 'Retro 80s CRT', subtitle: 'Vintage amber-green phosphor terminal on phosphor black', emoji: '👾', category: 'VIBE', categoryTitle: 'Modern & Moods', isDark: true, colors: ['#22c55e', '#f59e0b', '#030a05', '#06140a'] },
+      { id: 'HIGH_CONTRAST', title: 'High Contrast', subtitle: 'WCAG AAA cyber neon yellow & stark cyan', emoji: '⚡', category: 'VIBE', categoryTitle: 'Modern & Moods', isDark: true, colors: ['#ffff00', '#00ffff', '#000000', '#151515'] }
+    ];
+
+    // Initialize on window load
+    window.addEventListener('DOMContentLoaded', async () => {
+      initThemeSystem();
+      lucide.createIcons();
+      await checkServerStatus();
+      await fetchVaultData();
+      startLivePolling();
+    });
+
+    function initThemeSystem() {
+      applyTheme(currentThemeId, false);
+    }
+
+    function applyTheme(themeId) {
+      const theme = ALL_THEMES.find(t => t.id === themeId) || ALL_THEMES[1];
+      currentThemeId = theme.id;
+      localStorage.setItem('vault_web_theme', theme.id);
+
+      // Set data-theme attribute on root and body
+      document.documentElement.setAttribute('data-theme', theme.id);
+      document.body.setAttribute('data-theme', theme.id);
+      document.documentElement.classList.toggle('dark', theme.isDark);
+      document.documentElement.classList.toggle('light', !theme.isDark);
+
+      // Update header indicators
+      const headerEmoji = document.getElementById('headerThemeEmoji');
+      if (headerEmoji) headerEmoji.textContent = theme.emoji;
+      const headerTitle = document.getElementById('headerThemeTitle');
+      if (headerTitle) headerTitle.textContent = theme.title;
+
+      // Re-render theme modal if open
+      const modal = document.getElementById('themeModal');
+      if (modal && !modal.classList.contains('hidden')) {
+        renderThemes();
+      }
+
+      showToast('Theme switched to ' + theme.title, 'info');
+    }
+
+    function openThemeModal() {
+      renderThemes();
+      document.getElementById('themeModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function filterThemes(cat) {
+      currentThemeCategoryFilter = cat;
+      document.querySelectorAll('#themeCategoryTabs .theme-tab').forEach(tab => {
+        if (tab.dataset.cat === cat) {
+          tab.className = 'theme-tab active shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-xl font-medium transition bg-indigo-600 text-white';
+        } else {
+          tab.className = 'theme-tab shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-xl font-medium transition text-slate-400 hover:text-white hover:bg-slate-800';
+        }
+      });
+      renderThemes();
+    }
+
+    function renderThemes() {
+      const container = document.getElementById('themeGridContainer');
+      if (!container) return;
+
+      const filtered = currentThemeCategoryFilter === 'ALL'
+        ? ALL_THEMES
+        : ALL_THEMES.filter(t => t.category === currentThemeCategoryFilter);
+
+      container.innerHTML = filtered.map(theme => {
+        const isActive = theme.id === currentThemeId;
+        const activeClass = isActive ? 'is-active ring-2 ring-indigo-500/40 border-indigo-500' : 'border-slate-800 hover:border-slate-700';
+
+        return `
+          <div onclick="applyTheme('${theme.id}')"
+               class="theme-item-card p-3.5 rounded-xl transition cursor-pointer relative flex flex-col justify-between gap-3 text-left ${activeClass}">
+            <div>
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl shrink-0">${theme.emoji}</span>
+                  <div>
+                    <h4 class="text-xs font-bold tracking-tight">${theme.title}</h4>
+                    <span class="text-[10px] text-slate-400 font-medium">${theme.categoryTitle}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase ${theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}">
+                    ${theme.isDark ? '🌙 Dark' : '☀️ Light'}
+                  </span>
+                  ${isActive ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white flex items-center gap-1"><i data-lucide="check" class="w-2.5 h-2.5"></i> Active</span>' : ''}
+                </div>
+              </div>
+              <p class="text-[11px] mt-2 line-clamp-2 leading-relaxed opacity-80">${theme.subtitle}</p>
+            </div>
+
+            <!-- Color Palette Swatches -->
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
+              <span class="text-[10px] text-slate-400">Palette</span>
+              <div class="flex items-center gap-1.5">
+                ${theme.colors.map(c => `
+                  <span class="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm shrink-0" style="background-color: ${c};" title="${c}"></span>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Check if PIN auth is required
+    async function checkServerStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (data.requirePin && !authToken) {
+          document.getElementById('pinOverlay').classList.remove('hidden');
+          document.getElementById('pinInput').focus();
+        } else {
+          document.getElementById('pinOverlay').classList.add('hidden');
+        }
+      } catch (err) {
+        console.error('Error checking status:', err);
+      }
+    }
+
+    // Submit PIN
+    async function submitPin() {
+      const pin = document.getElementById('pinInput').value.trim();
+      if (!pin) return;
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pin })
+        });
+        const data = await res.json();
+        if (data.success) {
+          authToken = data.token;
+          sessionStorage.setItem('vault_auth_token', authToken);
+          document.getElementById('pinOverlay').classList.add('hidden');
+          showToast('Unlocked successfully', 'success');
+          fetchVaultData();
+        } else {
+          document.getElementById('pinError').classList.remove('hidden');
+        }
+      } catch (e) {
+        document.getElementById('pinError').classList.remove('hidden');
+      }
+    }
+
+    // Start polling /api/status every 2.5 seconds for real-time two-way synchronization
+    function startLivePolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/status', {
+            headers: { 'Authorization': authToken }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.version && data.version > serverVersion) {
+              console.log('Phone vault updated! Syncing latest changes...');
+              serverVersion = data.version;
+              await fetchVaultData(false);
+              showToast('Synced with phone updates', 'info');
+            }
+          }
+        } catch (e) {
+          // Quiet background poll error
+        }
+      }, 2500);
+    }
+
+    // Fetch full vault data from phone
+    async function fetchVaultData(showManualToast = false) {
+      const syncIcon = document.getElementById('syncIcon');
+      if (syncIcon) syncIcon.classList.add('animate-spin');
+
+      try {
+        const res = await fetch('/api/vault', {
+          headers: { 'Authorization': authToken }
+        });
+        if (res.status === 401) {
+          document.getElementById('pinOverlay').classList.remove('hidden');
+          return;
+        }
+        if (!res.ok) throw new Error('Failed to fetch data');
+
+        const data = await res.json();
+        vaultState = data;
+        serverVersion = data.version || serverVersion;
+
+        updateKpiStats();
+        updateMemberDropdowns();
+        renderActiveView();
+
+        if (showManualToast) {
+          showToast('Vault synchronized with phone', 'success');
+        }
+      } catch (err) {
+        console.error('Fetch error:', err);
+        if (showManualToast) {
+          showToast('Failed to connect to phone', 'error');
+        }
+      } finally {
+        if (syncIcon) syncIcon.classList.remove('animate-spin');
+      }
+    }
+
+    // Update KPI counters
+    function updateKpiStats() {
+      const totalCards = vaultState.creditCards.length + vaultState.debitCards.length;
+      const totalAssets = totalCards + vaultState.bankAccounts.length + vaultState.walletsAndGiftCards.length + vaultState.documents.length;
+
+      document.getElementById('kpiTotalAssets').textContent = totalAssets;
+      document.getElementById('kpiCards').textContent = totalCards;
+      document.getElementById('kpiBanks').textContent = vaultState.bankAccounts.length;
+      document.getElementById('kpiWallets').textContent = vaultState.walletsAndGiftCards.length;
+
+      document.getElementById('badgeCards').textContent = totalCards;
+      document.getElementById('badgeBanks').textContent = vaultState.bankAccounts.length;
+      document.getElementById('badgeWallets').textContent = vaultState.walletsAndGiftCards.length;
+      document.getElementById('badgeMembers').textContent = vaultState.members.length;
+      document.getElementById('badgeDocs').textContent = vaultState.documents.length;
+
+      // Calculate total wallet balance
+      let totalBal = 0;
+      vaultState.walletsAndGiftCards.forEach(w => {
+        totalBal += (Number(w.amount) || Number(w.currentBalance) || 0);
+      });
+      document.getElementById('kpiWalletBalance').textContent = '₹' + totalBal.toLocaleString('en-IN');
+    }
+
+    // Populate family member <select> across all modals
+    function updateMemberDropdowns() {
+      const selects = [
+        document.getElementById('cardMemberSelect'),
+        document.getElementById('bankMemberSelect'),
+        document.getElementById('walletMemberSelect'),
+        document.getElementById('docMemberSelect')
+      ];
+
+      selects.forEach(select => {
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">Personal / Unassigned</option>';
+        vaultState.members.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.name + (m.relationship ? ' (' + m.relationship + ')' : '');
+          select.appendChild(opt);
+        });
+        select.value = currentVal;
+      });
+    }
+
+    // Tab switching
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      const activeContent = document.getElementById('tab-' + tabId);
+      if (activeContent) activeContent.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('text-indigo-400', 'bg-indigo-500/10', 'border-indigo-500/20');
+        btn.classList.add('text-slate-400', 'hover:text-white', 'hover:bg-slate-900', 'border-transparent');
+      });
+
+      const activeNav = document.getElementById('nav-' + tabId);
+      if (activeNav) {
+        activeNav.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-slate-900', 'border-transparent');
+        activeNav.classList.add('text-indigo-400', 'bg-indigo-500/10', 'border-indigo-500/20');
+      }
+
+      renderActiveView();
+      lucide.createIcons();
+    }
+
+    // Search filter
+    function handleSearch(query) {
+      searchQuery = (query || '').toLowerCase().trim();
+      renderActiveView();
+    }
+
+    // Mask / Unmask toggle
+    function toggleGlobalMask() {
+      isMasked = !isMasked;
+      const icon = document.getElementById('maskToggleIcon');
+      if (icon) {
+        icon.setAttribute('data-lucide', isMasked ? 'eye-off' : 'eye');
+      }
+      renderActiveView();
+      lucide.createIcons();
+    }
+
+    function maskNumber(number) {
+      if (!number) return '';
+      if (!isMasked) return number;
+      const clean = number.replace(/\s+/g, '');
+      if (clean.length > 4) {
+        const last4 = clean.slice(-4);
+        return '•••• •••• •••• ' + last4;
+      }
+      return '•••• ' + clean;
+    }
+
+    function maskCvv(cvv) {
+      if (!cvv) return '•••';
+      return isMasked ? '•••' : cvv;
+    }
+
+    // Copy to clipboard helper
+    function copyText(text, label) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied ' + (label || 'number') + ' to clipboard', 'info');
+      }).catch(() => {
+        showToast('Failed to copy', 'error');
+      });
+    }
+
+    // Render current active tab content
+    function renderActiveView() {
+      if (currentTab === 'dashboard') {
+        renderDashboard();
+      } else if (currentTab === 'cards') {
+        renderCards();
+      } else if (currentTab === 'banks') {
+        renderBanks();
+      } else if (currentTab === 'wallets') {
+        renderWallets();
+      } else if (currentTab === 'members') {
+        renderMembers();
+      } else if (currentTab === 'docs') {
+        renderDocs();
+      }
+      lucide.createIcons();
+    }
+
+    function getMemberName(memberId) {
+      if (!memberId) return 'Personal';
+      const m = vaultState.members.find(x => x.id === memberId);
+      return m ? m.name : 'Personal';
+    }
+
+    // Render Dashboard
+    function renderDashboard() {
+      const cardsContainer = document.getElementById('dashboardCardsList');
+      const banksContainer = document.getElementById('dashboardBanksList');
+      if (!cardsContainer || !banksContainer) return;
+
+      const allCards = [
+        ...vaultState.creditCards.map(c => ({ ...c, type: 'CREDIT' })),
+        ...vaultState.debitCards.map(c => ({ ...c, type: 'DEBIT' }))
+      ];
+
+      if (allCards.length === 0) {
+        cardsContainer.innerHTML = '<div class="text-center py-6 text-slate-500 text-xs">No cards in vault yet.</div>';
+      } else {
+        cardsContainer.innerHTML = allCards.slice(0, 4).map(c => `
+          <div class="flex items-center justify-between p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl hover:border-slate-700 transition">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg ${c.type === 'CREDIT' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-emerald-500/20 text-emerald-400'} flex items-center justify-center font-bold text-xs">
+                ${c.type === 'CREDIT' ? 'CC' : 'DC'}
+              </div>
+              <div>
+                <p class="font-semibold text-white text-xs">${c.bankName} — ${c.cardName}</p>
+                <p class="font-mono text-[11px] text-slate-400">${maskNumber(c.cardNumber)}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-slate-400 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">${getMemberName(c.memberId)}</span>
+              <button onclick="copyText('${c.cardNumber}', 'card number')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      if (vaultState.bankAccounts.length === 0) {
+        banksContainer.innerHTML = '<div class="text-center py-6 text-slate-500 text-xs">No bank accounts yet.</div>';
+      } else {
+        banksContainer.innerHTML = vaultState.bankAccounts.slice(0, 4).map(b => `
+          <div class="flex items-center justify-between p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl hover:border-slate-700 transition">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs">
+                <i data-lucide="landmark" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <p class="font-semibold text-white text-xs">${b.bankName} (${b.accountType})</p>
+                <p class="font-mono text-[11px] text-slate-400">A/C: ${maskNumber(b.accountNumber)}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="copyText('${b.accountNumber}', 'account number')" title="Copy Account" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+              <button onclick="copyText('${b.ifscCode}', 'IFSC code')" title="Copy IFSC" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><i data-lucide="hash" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Render Cards
+    function renderCards() {
+      const container = document.getElementById('cardsGrid');
+      if (!container) return;
+
+      const allCards = [
+        ...vaultState.creditCards.map(c => ({ ...c, type: 'CREDIT' })),
+        ...vaultState.debitCards.map(c => ({ ...c, type: 'DEBIT' }))
+      ].filter(c => {
+        if (!searchQuery) return true;
+        return (c.bankName || '').toLowerCase().includes(searchQuery) ||
+               (c.cardName || '').toLowerCase().includes(searchQuery) ||
+               (c.cardholderName || '').toLowerCase().includes(searchQuery) ||
+               (c.cardNumber || '').includes(searchQuery);
+      });
+
+      if (allCards.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-xs">No cards matching query.</div>';
+        return;
+      }
+
+      container.innerHTML = allCards.map(c => {
+        const isCredit = c.type === 'CREDIT';
+        const gradClass = isCredit ? 'card-gradient-credit' : 'card-gradient-debit';
+        return `
+          <div class="payment-card relative rounded-2xl p-5 text-white shadow-xl flex flex-col justify-between h-56 border border-white/20 ${gradClass}">
+            <!-- Top Card Row -->
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold tracking-wider uppercase text-white">${c.bankName}</span>
+                <p class="text-[11px] card-subtext">${c.cardName}</p>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="px-2 py-0.5 text-[9px] font-bold rounded-md bg-black/35 text-white uppercase border border-white/10">${c.network || 'Card'}</span>
+                <button onclick="openEditCard('${c.id}', '${c.type}')" class="p-1 hover:bg-white/20 rounded-lg transition text-white"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                <button onclick="promptDelete('card', '${c.id}', '${c.cardName}', '${c.type}')" class="p-1 hover:bg-rose-500/30 rounded-lg transition text-rose-200"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+              </div>
+            </div>
+
+            <!-- Card Number -->
+            <div class="my-auto flex items-center justify-between">
+              <span class="font-mono text-base tracking-widest tabular-nums font-semibold text-white drop-shadow-sm">${maskNumber(c.cardNumber)}</span>
+              <button onclick="copyText('${c.cardNumber}', 'card number')" class="p-1.5 hover:bg-white/20 rounded-lg transition text-white" title="Copy Number">
+                <i data-lucide="copy" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <!-- Bottom Card Row -->
+            <div class="flex items-end justify-between text-[11px]">
+              <div>
+                <p class="text-[9px] uppercase tracking-wider card-muted">Cardholder</p>
+                <p class="font-medium tracking-wide uppercase text-white">${c.cardholderName || 'Family Member'}</p>
+              </div>
+              <div class="text-right flex items-center gap-4">
+                <div>
+                  <p class="text-[9px] uppercase tracking-wider card-muted">Expires</p>
+                  <p class="font-mono font-medium text-white">${c.expiry || '--/--'}</p>
+                </div>
+                <div>
+                  <p class="text-[9px] uppercase tracking-wider card-muted">CVV</p>
+                  <p class="font-mono font-medium text-white cursor-pointer" onclick="copyText('${c.cvv}', 'CVV')">${maskCvv(c.cvv)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render Bank Accounts
+    function renderBanks() {
+      const container = document.getElementById('banksList');
+      if (!container) return;
+
+      const filtered = vaultState.bankAccounts.filter(b => {
+        if (!searchQuery) return true;
+        return (b.bankName || '').toLowerCase().includes(searchQuery) ||
+               (b.accountHolderName || '').toLowerCase().includes(searchQuery) ||
+               (b.accountNumber || '').includes(searchQuery) ||
+               (b.ifscCode || '').toLowerCase().includes(searchQuery);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-xs">No bank accounts found.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(b => `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 hover:border-slate-700 transition">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                <i data-lucide="landmark" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-white text-sm">${b.bankName}</h4>
+                <p class="text-xs text-slate-400">${b.accountType} • ${getMemberName(b.memberId)}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="openEditBank('${b.id}')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+              <button onclick="promptDelete('bank', '${b.id}', '${b.bankName}')" class="p-1.5 text-rose-400 hover:text-rose-300 rounded-lg hover:bg-rose-500/10"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80 text-xs">
+            <div>
+              <p class="text-[10px] text-slate-500 uppercase">Account Number</p>
+              <div class="flex items-center gap-1.5 font-mono text-white mt-0.5">
+                <span>${maskNumber(b.accountNumber)}</span>
+                <button onclick="copyText('${b.accountNumber}', 'Account number')" class="text-slate-400 hover:text-white"><i data-lucide="copy" class="w-3 h-3"></i></button>
+              </div>
+            </div>
+            <div>
+              <p class="text-[10px] text-slate-500 uppercase">IFSC Code</p>
+              <div class="flex items-center gap-1.5 font-mono text-cyan-400 uppercase mt-0.5">
+                <span>${b.ifscCode}</span>
+                <button onclick="copyText('${b.ifscCode}', 'IFSC code')" class="text-slate-400 hover:text-white"><i data-lucide="copy" class="w-3 h-3"></i></button>
+              </div>
+            </div>
+            <div>
+              <p class="text-[10px] text-slate-500 uppercase">Account Holder</p>
+              <p class="text-slate-300 mt-0.5">${b.accountHolderName || 'Family Member'}</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-slate-500 uppercase">Branch</p>
+              <p class="text-slate-300 mt-0.5">${b.branchName || 'Main Branch'}</p>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render Wallets
+    function renderWallets() {
+      const container = document.getElementById('walletsList');
+      if (!container) return;
+
+      const filtered = vaultState.walletsAndGiftCards.filter(w => {
+        if (!searchQuery) return true;
+        return (w.providerOrName || '').toLowerCase().includes(searchQuery) ||
+               (w.cardNumberOrUpi || '').toLowerCase().includes(searchQuery);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-xs">No wallets or gift vouchers found.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(w => `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 hover:border-slate-700 transition">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+                <i data-lucide="${w.isGiftCard ? 'gift' : 'wallet'}" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-white text-sm">${w.providerOrName}</h4>
+                <p class="text-xs text-slate-400">${w.isGiftCard ? 'Gift Card' : 'Online Wallet'} • ${getMemberName(w.memberId)}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="openEditWallet('${w.id}')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+              <button onclick="promptDelete('wallet', '${w.id}', '${w.providerOrName}')" class="p-1.5 text-rose-400 hover:text-rose-300 rounded-lg hover:bg-rose-500/10"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-800/80 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">${w.isGiftCard ? 'Voucher Code' : 'UPI ID'}:</span>
+              <div class="flex items-center gap-1.5 font-mono text-white">
+                <span>${maskNumber(w.cardNumberOrUpi)}</span>
+                <button onclick="copyText('${w.cardNumberOrUpi}', 'Voucher/UPI')" class="text-slate-400 hover:text-white"><i data-lucide="copy" class="w-3 h-3"></i></button>
+              </div>
+            </div>
+
+            ${w.giftCardPin ? `
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500">PIN:</span>
+                <div class="flex items-center gap-1.5 font-mono text-amber-400">
+                  <span>${maskCvv(w.giftCardPin)}</span>
+                  <button onclick="copyText('${w.giftCardPin}', 'PIN')" class="text-slate-400 hover:text-white"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                </div>
+              </div>
+            ` : ''}
+
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-slate-500">Balance:</span>
+              <span class="font-mono font-bold text-emerald-400 text-sm">₹${(Number(w.amount) || Number(w.currentBalance) || 0).toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render Family Members
+    function renderMembers() {
+      const container = document.getElementById('membersList');
+      if (!container) return;
+
+      const filtered = vaultState.members.filter(m => {
+        if (!searchQuery) return true;
+        return (m.name || '').toLowerCase().includes(searchQuery) ||
+               (m.relationship || '').toLowerCase().includes(searchQuery);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-xs">No family members registered yet.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(m => `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 hover:border-slate-700 transition">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-sm">
+                ${m.initials || m.name.substring(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <h4 class="font-bold text-white text-sm flex items-center gap-1.5">
+                  <span>${m.name}</span>
+                  ${m.isEmergencyContact ? '<i data-lucide="heart" class="w-3.5 h-3.5 text-rose-400 fill-rose-400" title="Emergency Contact"></i>' : ''}
+                </h4>
+                <p class="text-xs text-purple-400 font-medium">${m.relationship || 'Member'}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="openEditMember('${m.id}')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+              <button onclick="promptDelete('member', '${m.id}', '${m.name}')" class="p-1.5 text-rose-400 hover:text-rose-300 rounded-lg hover:bg-rose-500/10"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-800/80 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Blood Group:</span>
+              <span class="font-semibold text-rose-400">${m.bloodGroup || 'Not specified'}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Emergency Phone:</span>
+              <span class="font-mono text-slate-300">${m.emergencyPhone || '--'}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render Documents
+    function renderDocs() {
+      const container = document.getElementById('docsList');
+      if (!container) return;
+
+      const filtered = vaultState.documents.filter(d => {
+        if (!searchQuery) return true;
+        return (d.title || '').toLowerCase().includes(searchQuery) ||
+               (d.docNumber || '').toLowerCase().includes(searchQuery);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-xs">No documents stored in vault yet.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(d => `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 hover:border-slate-700 transition">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-white text-sm">${d.title || 'Personal Document'}</h4>
+                <p class="text-xs text-slate-400">${getMemberName(d.memberId)}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="openEditDoc('${d.id}')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+              <button onclick="promptDelete('doc', '${d.id}', '${d.title}')" class="p-1.5 text-rose-400 hover:text-rose-300 rounded-lg hover:bg-rose-500/10"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-800/80 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500">Document Number:</span>
+              <div class="flex items-center gap-1.5 font-mono text-white">
+                <span>${maskNumber(d.docNumber)}</span>
+                <button onclick="copyText('${d.docNumber}', 'Document number')" class="text-slate-400 hover:text-white"><i data-lucide="copy" class="w-3 h-3"></i></button>
+              </div>
+            </div>
+            ${d.notes ? `
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500">Notes / Password:</span>
+                <span class="text-slate-300">${d.notes}</span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Modal Helpers
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    function toggleNewMenu() {
+      const menu = document.getElementById('newMenuDropdown');
+      menu.classList.toggle('hidden');
+    }
+
+    // Close menu when clicking outside
+    window.addEventListener('click', (e) => {
+      const menu = document.getElementById('newMenuDropdown');
+      if (menu && !menu.contains(e.target) && !e.target.closest('button[onclick="toggleNewMenu()"]')) {
+        menu.classList.add('hidden');
+      }
+    });
+
+    // OPEN ADD / EDIT MODALS
+    function openAddCardModal(type = 'CREDIT') {
+      document.getElementById('cardModalTitle').textContent = type === 'CREDIT' ? 'Add Credit Card' : 'Add Debit Card';
+      document.getElementById('cardFormId').value = '';
+      document.getElementById('cardFormType').value = type;
+      document.getElementById('cardBankName').value = '';
+      document.getElementById('cardCardName').value = '';
+      document.getElementById('cardHolderName').value = '';
+      document.getElementById('cardNumber').value = '';
+      document.getElementById('cardExpiry').value = '';
+      document.getElementById('cardCvv').value = '';
+      document.getElementById('cardStatementDate').value = '';
+      document.getElementById('cardDueDate').value = '';
+      document.getElementById('cardMemberSelect').value = '';
+      document.getElementById('cardModal').classList.remove('hidden');
+      document.getElementById('newMenuDropdown').classList.add('hidden');
+    }
+
+    function openEditCard(cardId, type) {
+      const card = (type === 'CREDIT' ? vaultState.creditCards : vaultState.debitCards).find(x => x.id === cardId);
+      if (!card) return;
+
+      document.getElementById('cardModalTitle').textContent = type === 'CREDIT' ? 'Edit Credit Card' : 'Edit Debit Card';
+      document.getElementById('cardFormId').value = card.id;
+      document.getElementById('cardFormType').value = type;
+      document.getElementById('cardBankName').value = card.bankName || '';
+      document.getElementById('cardCardName').value = card.cardName || '';
+      document.getElementById('cardHolderName').value = card.cardholderName || '';
+      document.getElementById('cardNumber').value = card.cardNumber || '';
+      document.getElementById('cardExpiry').value = card.expiry || '';
+      document.getElementById('cardCvv').value = card.cvv || '';
+      document.getElementById('cardStatementDate').value = card.statementDate || '';
+      document.getElementById('cardDueDate').value = card.dueDate || '';
+      document.getElementById('cardNetwork').value = card.network || 'VISA';
+      document.getElementById('cardMemberSelect').value = card.memberId || '';
+      document.getElementById('cardModal').classList.remove('hidden');
+    }
+
+    function openAddBankModal() {
+      document.getElementById('bankModalTitle').textContent = 'Add Bank Account';
+      document.getElementById('bankFormId').value = '';
+      document.getElementById('bankNameInput').value = '';
+      document.getElementById('bankTypeInput').value = 'Savings';
+      document.getElementById('bankHolderInput').value = '';
+      document.getElementById('bankNumberInput').value = '';
+      document.getElementById('bankIfscInput').value = '';
+      document.getElementById('bankBranchInput').value = '';
+      document.getElementById('bankMemberSelect').value = '';
+      document.getElementById('bankModal').classList.remove('hidden');
+      document.getElementById('newMenuDropdown').classList.add('hidden');
+    }
+
+    function openEditBank(bankId) {
+      const b = vaultState.bankAccounts.find(x => x.id === bankId);
+      if (!b) return;
+
+      document.getElementById('bankModalTitle').textContent = 'Edit Bank Account';
+      document.getElementById('bankFormId').value = b.id;
+      document.getElementById('bankNameInput').value = b.bankName || '';
+      document.getElementById('bankTypeInput').value = b.accountType || 'Savings';
+      document.getElementById('bankHolderInput').value = b.accountHolderName || '';
+      document.getElementById('bankNumberInput').value = b.accountNumber || '';
+      document.getElementById('bankIfscInput').value = b.ifscCode || '';
+      document.getElementById('bankBranchInput').value = b.branchName || '';
+      document.getElementById('bankMemberSelect').value = b.memberId || '';
+      document.getElementById('bankModal').classList.remove('hidden');
+    }
+
+    function openAddWalletModal() {
+      document.getElementById('walletModalTitle').textContent = 'Add Wallet or Voucher';
+      document.getElementById('walletFormId').value = '';
+      document.getElementById('walletIsGiftCard').value = 'false';
+      document.getElementById('walletProvider').value = '';
+      document.getElementById('walletNumber').value = '';
+      document.getElementById('walletPin').value = '';
+      document.getElementById('walletAmount').value = '';
+      document.getElementById('walletExpiry').value = '';
+      document.getElementById('walletMemberSelect').value = '';
+      document.getElementById('walletModal').classList.remove('hidden');
+      document.getElementById('newMenuDropdown').classList.add('hidden');
+    }
+
+    function openEditWallet(walletId) {
+      const w = vaultState.walletsAndGiftCards.find(x => x.id === walletId);
+      if (!w) return;
+
+      document.getElementById('walletModalTitle').textContent = 'Edit Wallet or Voucher';
+      document.getElementById('walletFormId').value = w.id;
+      document.getElementById('walletIsGiftCard').value = w.isGiftCard ? 'true' : 'false';
+      document.getElementById('walletProvider').value = w.providerOrName || '';
+      document.getElementById('walletNumber').value = w.cardNumberOrUpi || '';
+      document.getElementById('walletPin').value = w.giftCardPin || '';
+      document.getElementById('walletAmount').value = w.amount || w.currentBalance || '';
+      document.getElementById('walletExpiry').value = w.expiryDate || '';
+      document.getElementById('walletMemberSelect').value = w.memberId || '';
+      document.getElementById('walletModal').classList.remove('hidden');
+    }
+
+    function openAddMemberModal() {
+      document.getElementById('memberModalTitle').textContent = 'Add Family Member';
+      document.getElementById('memberFormId').value = '';
+      document.getElementById('memberNameInput').value = '';
+      document.getElementById('memberRelCategory').value = 'SPOUSE';
+      document.getElementById('memberBloodGroup').value = '';
+      document.getElementById('memberPhone').value = '';
+      document.getElementById('memberIsEmergency').checked = false;
+      document.getElementById('memberModal').classList.remove('hidden');
+      document.getElementById('newMenuDropdown').classList.add('hidden');
+    }
+
+    function openEditMember(memberId) {
+      const m = vaultState.members.find(x => x.id === memberId);
+      if (!m) return;
+
+      document.getElementById('memberModalTitle').textContent = 'Edit Family Member';
+      document.getElementById('memberFormId').value = m.id;
+      document.getElementById('memberNameInput').value = m.name || '';
+      document.getElementById('memberRelCategory').value = m.relationshipCategory || 'OTHERS';
+      document.getElementById('memberBloodGroup').value = m.bloodGroup || '';
+      document.getElementById('memberPhone').value = m.emergencyPhone || '';
+      document.getElementById('memberIsEmergency').checked = !!m.isEmergencyContact;
+      document.getElementById('memberModal').classList.remove('hidden');
+    }
+
+    function openAddDocModal() {
+      document.getElementById('docModalTitle').textContent = 'Add Document';
+      document.getElementById('docFormId').value = '';
+      document.getElementById('docTitleInput').value = '';
+      document.getElementById('docNumberInput').value = '';
+      document.getElementById('docNotesInput').value = '';
+      document.getElementById('docMemberSelect').value = '';
+      document.getElementById('docModal').classList.remove('hidden');
+      document.getElementById('newMenuDropdown').classList.add('hidden');
+    }
+
+    function openEditDoc(docId) {
+      const d = vaultState.documents.find(x => x.id === docId);
+      if (!d) return;
+
+      document.getElementById('docModalTitle').textContent = 'Edit Document';
+      document.getElementById('docFormId').value = d.id;
+      document.getElementById('docTitleInput').value = d.title || '';
+      document.getElementById('docNumberInput').value = d.docNumber || '';
+      document.getElementById('docNotesInput').value = d.notes || '';
+      document.getElementById('docMemberSelect').value = d.memberId || '';
+      document.getElementById('docModal').classList.remove('hidden');
+    }
+
+    // ==================== FORM SUBMIT HANDLERS (SAVE TO PHONE) ====================
+
+    async function handleSaveCard(e) {
+      e.preventDefault();
+      const type = document.getElementById('cardFormType').value;
+      const card = {
+        id: document.getElementById('cardFormId').value || ('card_' + Date.now()),
+        bankName: document.getElementById('cardBankName').value.trim(),
+        cardName: document.getElementById('cardCardName').value.trim(),
+        cardholderName: document.getElementById('cardHolderName').value.trim(),
+        network: document.getElementById('cardNetwork').value,
+        cardNumber: document.getElementById('cardNumber').value.trim(),
+        expiry: document.getElementById('cardExpiry').value.trim(),
+        cvv: document.getElementById('cardCvv').value.trim(),
+        statementDate: document.getElementById('cardStatementDate').value.trim(),
+        dueDate: document.getElementById('cardDueDate').value.trim(),
+        memberId: document.getElementById('cardMemberSelect').value
+      };
+
+      const endpoint = type === 'CREDIT' ? '/api/cards/credit' : '/api/cards/debit';
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken
+          },
+          body: JSON.stringify(card)
+        });
+        const result = await res.json();
+        if (result.success) {
+          closeModal('cardModal');
+          showToast('Card saved to Android Vault!', 'success');
+          await fetchVaultData();
+        } else {
+          showToast(result.error || 'Failed to save card', 'error');
+        }
+      } catch (err) {
+        showToast('Network error saving card', 'error');
+      }
+    }
+
+    async function handleSaveBank(e) {
+      e.preventDefault();
+      const bank = {
+        id: document.getElementById('bankFormId').value || ('bank_' + Date.now()),
+        bankName: document.getElementById('bankNameInput').value.trim(),
+        accountType: document.getElementById('bankTypeInput').value,
+        accountHolderName: document.getElementById('bankHolderInput').value.trim(),
+        accountNumber: document.getElementById('bankNumberInput').value.trim(),
+        ifscCode: document.getElementById('bankIfscInput').value.trim().toUpperCase(),
+        branchName: document.getElementById('bankBranchInput').value.trim(),
+        memberId: document.getElementById('bankMemberSelect').value
+      };
+
+      try {
+        const res = await fetch('/api/banks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken
+          },
+          body: JSON.stringify(bank)
+        });
+        const result = await res.json();
+        if (result.success) {
+          closeModal('bankModal');
+          showToast('Bank account saved to Android Vault!', 'success');
+          await fetchVaultData();
+        } else {
+          showToast(result.error || 'Failed to save account', 'error');
+        }
+      } catch (err) {
+        showToast('Network error saving account', 'error');
+      }
+    }
+
+    async function handleSaveWallet(e) {
+      e.preventDefault();
+      const wallet = {
+        id: document.getElementById('walletFormId').value || ('wallet_' + Date.now()),
+        isGiftCard: document.getElementById('walletIsGiftCard').value === 'true',
+        providerOrName: document.getElementById('walletProvider').value.trim(),
+        cardNumberOrUpi: document.getElementById('walletNumber').value.trim(),
+        giftCardPin: document.getElementById('walletPin').value.trim(),
+        amount: parseFloat(document.getElementById('walletAmount').value) || 0,
+        expiryDate: document.getElementById('walletExpiry').value.trim(),
+        memberId: document.getElementById('walletMemberSelect').value
+      };
+
+      try {
+        const res = await fetch('/api/wallets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken
+          },
+          body: JSON.stringify(wallet)
+        });
+        const result = await res.json();
+        if (result.success) {
+          closeModal('walletModal');
+          showToast('Saved to Android Vault!', 'success');
+          await fetchVaultData();
+        } else {
+          showToast(result.error || 'Failed to save', 'error');
+        }
+      } catch (err) {
+        showToast('Network error saving item', 'error');
+      }
+    }
+
+    async function handleSaveMember(e) {
+      e.preventDefault();
+      const member = {
+        id: document.getElementById('memberFormId').value || ('mem_' + Date.now()),
+        name: document.getElementById('memberNameInput').value.trim(),
+        relationship: document.getElementById('memberRelCategory').value,
+        relationshipCategory: document.getElementById('memberRelCategory').value,
+        bloodGroup: document.getElementById('memberBloodGroup').value.trim(),
+        emergencyPhone: document.getElementById('memberPhone').value.trim(),
+        isEmergencyContact: document.getElementById('memberIsEmergency').checked
+      };
+
+      try {
+        const res = await fetch('/api/members', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken
+          },
+          body: JSON.stringify(member)
+        });
+        const result = await res.json();
+        if (result.success) {
+          closeModal('memberModal');
+          showToast('Family member saved to Android Vault!', 'success');
+          await fetchVaultData();
+        } else {
+          showToast(result.error || 'Failed to save member', 'error');
+        }
+      } catch (err) {
+        showToast('Network error saving member', 'error');
+      }
+    }
+
+    async function handleSaveDoc(e) {
+      e.preventDefault();
+      const doc = {
+        id: document.getElementById('docFormId').value || ('doc_' + Date.now()),
+        title: document.getElementById('docTitleInput').value.trim(),
+        docNumber: document.getElementById('docNumberInput').value.trim(),
+        notes: document.getElementById('docNotesInput').value.trim(),
+        memberId: document.getElementById('docMemberSelect').value
+      };
+
+      try {
+        const res = await fetch('/api/documents', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken
+          },
+          body: JSON.stringify(doc)
+        });
+        const result = await res.json();
+        if (result.success) {
+          closeModal('docModal');
+          showToast('Document saved to Android Vault!', 'success');
+          await fetchVaultData();
+        } else {
+          showToast(result.error || 'Failed to save document', 'error');
+        }
+      } catch (err) {
+        showToast('Network error saving document', 'error');
+      }
+    }
+
+    // ==================== DELETE HANDLERS ====================
+
+    let deleteTarget = null;
+
+    function promptDelete(category, id, title, extraType) {
+      deleteTarget = { category, id, title, extraType };
+      document.getElementById('deletePrompt').textContent = 'Are you sure you want to delete "' + title + '" from your vault? This will instantly sync with your phone.';
+      document.getElementById('deleteModal').classList.remove('hidden');
+
+      document.getElementById('confirmDeleteBtn').onclick = executeDelete;
+    }
+
+    async function executeDelete() {
+      if (!deleteTarget) return;
+      const { category, id, extraType } = deleteTarget;
+
+      let url = '';
+      if (category === 'card') {
+        url = extraType === 'CREDIT' ? '/api/cards/credit?id=' + id : '/api/cards/debit?id=' + id;
+      } else if (category === 'bank') {
+        url = '/api/banks?id=' + id;
+      } else if (category === 'wallet') {
+        url = '/api/wallets?id=' + id;
+      } else if (category === 'member') {
+        url = '/api/members?id=' + id;
+      } else if (category === 'doc') {
+        url = '/api/documents?id=' + id;
+      }
+
+      try {
+        const res = await fetch(url, {
+          method: 'DELETE',
+          headers: { 'Authorization': authToken }
+        });
+        const result = await res.json();
+        if (result.success) {
+          closeModal('deleteModal');
+          showToast('Item deleted from Android Vault', 'info');
+          await fetchVaultData();
+        } else {
+          showToast(result.error || 'Failed to delete', 'error');
+        }
+      } catch (err) {
+        showToast('Network error deleting item', 'error');
+      }
+    }
+
+    // Toast notifications
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+
+      const bg = type === 'success' ? 'bg-emerald-600 text-white shadow-emerald-600/20' :
+                 type === 'error' ? 'bg-rose-600 text-white shadow-rose-600/20' :
+                 'bg-indigo-600 text-white shadow-indigo-600/20';
+
+      const icon = type === 'success' ? 'check-circle' :
+                   type === 'error' ? 'alert-triangle' :
+                   'info';
+
+      toast.className = 'px-4 py-3 rounded-xl shadow-lg border border-white/10 flex items-center gap-2.5 text-xs font-medium pointer-events-auto transition transform translate-y-2 opacity-0 duration-200 ' + bg;
+      toast.innerHTML = '<i data-lucide="' + icon + '" class="w-4 h-4 shrink-0"></i><span>' + message + '</span>';
+
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

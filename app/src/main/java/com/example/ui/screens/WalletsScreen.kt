@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -35,8 +36,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
@@ -45,8 +49,10 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CardGiftcard
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -104,6 +110,7 @@ fun WalletsScreen(
     onDeleteSubscription: (String) -> Unit,
     onOpenSpendGiftCard: (WalletOrGiftCard) -> Unit,
     onShowUpiQr: (String, String) -> Unit,
+    onToggleMarkedAsUsed: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -181,6 +188,10 @@ fun WalletsScreen(
                 } else {
                     when (uiState.getDisplayModeForTab(NavigationTab.WALLETS)) {
                         DisplayMode.CAROUSEL -> {
+                            var isUsedExpanded by remember { mutableStateOf(false) }
+                            val activeItems = displayedItems.filter { !it.isGiftCard || !it.isMarkedAsUsed }
+                            val usedItems = displayedItems.filter { it.isGiftCard && it.isMarkedAsUsed }
+
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -188,23 +199,101 @@ fun WalletsScreen(
                                 contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                item {
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                        contentPadding = PaddingValues(horizontal = 16.dp)
-                                    ) {
-                                        items(displayedItems, key = { it.id }) { item ->
-                                            val member = uiState.members.find { it.id == item.memberId }
-                                            Box(modifier = Modifier.width(320.dp)) {
-                                                WalletOrGiftCardItem(
-                                                    item = item,
-                                                    memberName = member?.name,
-                                                    onEdit = { onOpenEditWalletOrGiftCard(item) },
-                                                    onDelete = { itemToDelete = item },
-                                                    onSpend = { onOpenSpendGiftCard(item) },
-                                                    onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
-                                                    onCopyText = { label, value -> copyToClipboard(context, label, value) }
-                                                )
+                                if (activeItems.isNotEmpty()) {
+                                    item(key = "active_header") {
+                                        Text(
+                                            text = "Active (${activeItems.size})",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    item(key = "active_row") {
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                            contentPadding = PaddingValues(horizontal = 16.dp)
+                                        ) {
+                                            items(activeItems, key = { it.id }) { item ->
+                                                val member = uiState.members.find { it.id == item.memberId }
+                                                Box(modifier = Modifier.width(320.dp)) {
+                                                    WalletOrGiftCardItem(
+                                                        item = item,
+                                                        memberName = member?.name,
+                                                        onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                                        onDelete = { itemToDelete = item },
+                                                        onSpend = { onOpenSpendGiftCard(item) },
+                                                        onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                                        onCopyText = { label, value -> copyToClipboard(context, label, value) },
+                                                        onToggleMarkedAsUsed = { onToggleMarkedAsUsed(item.id) }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (usedItems.isNotEmpty()) {
+                                    item(key = "used_header") {
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
+                                                .clickable { isUsedExpanded = !isUsedExpanded },
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isUsedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                        contentDescription = "Expand/Collapse Used"
+                                                    )
+                                                    Text(
+                                                        text = "Used (${usedItems.size})",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+                                                    Text(
+                                                        text = "${usedItems.size}",
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (isUsedExpanded) {
+                                        item(key = "used_row") {
+                                            LazyRow(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                contentPadding = PaddingValues(horizontal = 16.dp)
+                                            ) {
+                                                items(usedItems, key = { it.id }) { item ->
+                                                    val member = uiState.members.find { it.id == item.memberId }
+                                                    Box(modifier = Modifier.width(320.dp)) {
+                                                        WalletOrGiftCardItem(
+                                                            item = item,
+                                                            memberName = member?.name,
+                                                            onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                                            onDelete = { itemToDelete = item },
+                                                            onSpend = { onOpenSpendGiftCard(item) },
+                                                            onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                                            onCopyText = { label, value -> copyToClipboard(context, label, value) },
+                                                            onToggleMarkedAsUsed = { onToggleMarkedAsUsed(item.id) }
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -213,6 +302,10 @@ fun WalletsScreen(
                         }
 
                         DisplayMode.GRID -> {
+                            var isUsedExpanded by remember { mutableStateOf(false) }
+                            val activeItems = displayedItems.filter { !it.isGiftCard || !it.isMarkedAsUsed }
+                            val usedItems = displayedItems.filter { it.isGiftCard && it.isMarkedAsUsed }
+
                             LazyVerticalGrid(
                                 columns = GridCells.Adaptive(minSize = 300.dp),
                                 modifier = Modifier
@@ -222,22 +315,94 @@ fun WalletsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                items(displayedItems, key = { it.id }) { item ->
-                                    val member = uiState.members.find { it.id == item.memberId }
-                                    WalletOrGiftCardItem(
-                                        item = item,
-                                        memberName = member?.name,
-                                        onEdit = { onOpenEditWalletOrGiftCard(item) },
-                                        onDelete = { itemToDelete = item },
-                                        onSpend = { onOpenSpendGiftCard(item) },
-                                        onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
-                                        onCopyText = { label, value -> copyToClipboard(context, label, value) }
-                                    )
+                                if (activeItems.isNotEmpty()) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        Text(
+                                            text = "Active (${activeItems.size})",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        )
+                                    }
+                                    items(activeItems, key = { it.id }) { item ->
+                                        val member = uiState.members.find { it.id == item.memberId }
+                                        WalletOrGiftCardItem(
+                                            item = item,
+                                            memberName = member?.name,
+                                            onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                            onDelete = { itemToDelete = item },
+                                            onSpend = { onOpenSpendGiftCard(item) },
+                                            onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                            onCopyText = { label, value -> copyToClipboard(context, label, value) },
+                                            onToggleMarkedAsUsed = { onToggleMarkedAsUsed(item.id) }
+                                        )
+                                    }
+                                }
+
+                                if (usedItems.isNotEmpty()) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { isUsedExpanded = !isUsedExpanded },
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isUsedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                        contentDescription = "Expand/Collapse Used"
+                                                    )
+                                                    Text(
+                                                        text = "Used (${usedItems.size})",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+                                                    Text(
+                                                        text = "${usedItems.size}",
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (isUsedExpanded) {
+                                        items(usedItems, key = { it.id }) { item ->
+                                            val member = uiState.members.find { it.id == item.memberId }
+                                            WalletOrGiftCardItem(
+                                                item = item,
+                                                memberName = member?.name,
+                                                onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                                onDelete = { itemToDelete = item },
+                                                onSpend = { onOpenSpendGiftCard(item) },
+                                                onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                                onCopyText = { label, value -> copyToClipboard(context, label, value) },
+                                                onToggleMarkedAsUsed = { onToggleMarkedAsUsed(item.id) }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
 
                         DisplayMode.LIST -> {
+                            var isUsedExpanded by remember { mutableStateOf(false) }
+                            val activeItems = displayedItems.filter { !it.isGiftCard || !it.isMarkedAsUsed }
+                            val usedItems = displayedItems.filter { it.isGiftCard && it.isMarkedAsUsed }
+
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -245,17 +410,85 @@ fun WalletsScreen(
                                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                items(displayedItems, key = { it.id }) { item ->
-                                    val member = uiState.members.find { it.id == item.memberId }
-                                    WalletOrGiftCardItem(
-                                        item = item,
-                                        memberName = member?.name,
-                                        onEdit = { onOpenEditWalletOrGiftCard(item) },
-                                        onDelete = { itemToDelete = item },
-                                        onSpend = { onOpenSpendGiftCard(item) },
-                                        onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
-                                        onCopyText = { label, value -> copyToClipboard(context, label, value) }
-                                    )
+                                if (activeItems.isNotEmpty()) {
+                                    item(key = "active_header") {
+                                        Text(
+                                            text = "Active (${activeItems.size})",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        )
+                                    }
+                                    items(activeItems, key = { it.id }) { item ->
+                                        val member = uiState.members.find { it.id == item.memberId }
+                                        WalletOrGiftCardItem(
+                                            item = item,
+                                            memberName = member?.name,
+                                            onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                            onDelete = { itemToDelete = item },
+                                            onSpend = { onOpenSpendGiftCard(item) },
+                                            onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                            onCopyText = { label, value -> copyToClipboard(context, label, value) },
+                                            onToggleMarkedAsUsed = { onToggleMarkedAsUsed(item.id) }
+                                        )
+                                    }
+                                }
+
+                                if (usedItems.isNotEmpty()) {
+                                    item(key = "used_header") {
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { isUsedExpanded = !isUsedExpanded },
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isUsedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                        contentDescription = "Expand/Collapse Used"
+                                                    )
+                                                    Text(
+                                                        text = "Used (${usedItems.size})",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+                                                    Text(
+                                                        text = "${usedItems.size}",
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (isUsedExpanded) {
+                                        items(usedItems, key = { it.id }) { item ->
+                                            val member = uiState.members.find { it.id == item.memberId }
+                                            WalletOrGiftCardItem(
+                                                item = item,
+                                                memberName = member?.name,
+                                                onEdit = { onOpenEditWalletOrGiftCard(item) },
+                                                onDelete = { itemToDelete = item },
+                                                onSpend = { onOpenSpendGiftCard(item) },
+                                                onShowQr = { onShowUpiQr(item.cardNumberOrUpi, item.providerOrName) },
+                                                onCopyText = { label, value -> copyToClipboard(context, label, value) },
+                                                onToggleMarkedAsUsed = { onToggleMarkedAsUsed(item.id) }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -487,15 +720,18 @@ private fun WalletOrGiftCardItem(
     onDelete: () -> Unit,
     onSpend: () -> Unit,
     onShowQr: () -> Unit,
-    onCopyText: (String, String) -> Unit
+    onCopyText: (String, String) -> Unit,
+    onToggleMarkedAsUsed: () -> Unit = {}
 ) {
     val accentColor = Color(item.colorHex)
 
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, if (item.isMarkedAsUsed) MaterialTheme.colorScheme.outlineVariant else accentColor.copy(alpha = 0.35f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (item.isMarkedAsUsed) 0.dp else 2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -516,14 +752,14 @@ private fun WalletOrGiftCardItem(
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = accentColor.copy(alpha = 0.15f),
+                        color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.surfaceVariant else accentColor.copy(alpha = 0.15f),
                         modifier = Modifier.size(42.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = if (item.isGiftCard) Icons.Filled.CardGiftcard else Icons.Outlined.AccountBalanceWallet,
                                 contentDescription = null,
-                                tint = accentColor,
+                                tint = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.onSurfaceVariant else accentColor,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -537,14 +773,17 @@ private fun WalletOrGiftCardItem(
                         )
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = accentColor.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
+                            color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.surfaceVariant else accentColor.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, if (item.isMarkedAsUsed) MaterialTheme.colorScheme.outlineVariant else accentColor.copy(alpha = 0.3f))
                         ) {
                             Text(
-                                text = if (item.isGiftCard) "Gift Card • ${if (item.amount > 0) "₹${item.amount.toInt()}" else "Voucher"}" else "Online Wallet • ${item.kycStatus}",
+                                text = if (item.isGiftCard) {
+                                    if (item.isMarkedAsUsed) "Gift Card • USED"
+                                    else "Gift Card • Balance ₹${item.currentBalance.toInt()}"
+                                } else "Online Wallet • ${item.kycStatus}",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = accentColor
+                                color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.onSurfaceVariant else accentColor
                             )
                         }
                     }
@@ -565,18 +804,19 @@ private fun WalletOrGiftCardItem(
                 }
             }
 
-            // Gift Card Remaining Balance Tracker with Spend Action
-            if (item.isGiftCard && item.initialAmount > 0) {
-                val balanceRatio = (item.currentBalance / item.initialAmount).coerceIn(0.0, 1.0).toFloat()
+            // Gift Card Remaining Balance Tracker with Spend & Mark-Used Actions
+            if (item.isGiftCard) {
+                val totalAmt = if (item.initialAmount > 0.0) item.initialAmount else (if (item.amount > 0.0) item.amount else item.currentBalance)
+                val balanceRatio = if (totalAmt > 0) (item.currentBalance / totalAmt).coerceIn(0.0, 1.0).toFloat() else 0f
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = accentColor.copy(alpha = 0.08f),
-                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.2f)),
+                    color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else accentColor.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, if (item.isMarkedAsUsed) MaterialTheme.colorScheme.outlineVariant else accentColor.copy(alpha = 0.2f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -585,18 +825,51 @@ private fun WalletOrGiftCardItem(
                         ) {
                             Column {
                                 Text("REMAINING BALANCE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("₹${item.currentBalance.toInt()} / ₹${item.initialAmount.toInt()}", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = accentColor)
+                                Text("₹${item.currentBalance.toInt()} / ₹${totalAmt.toInt()}", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.onSurfaceVariant else accentColor)
                             }
 
-                            OutlinedButton(
-                                onClick = onSpend,
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("- Spend", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                // Toggle Marked as Used Button
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    border = BorderStroke(1.dp, if (item.isMarkedAsUsed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.clickable { onToggleMarkedAsUsed() }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (item.isMarkedAsUsed) Icons.Default.CheckCircle else Icons.Outlined.CheckCircle,
+                                            contentDescription = null,
+                                            tint = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = if (item.isMarkedAsUsed) "Used ✓" else "Mark Used",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                            color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                if (!item.isMarkedAsUsed) {
+                                    OutlinedButton(
+                                        onClick = onSpend,
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("- Spend", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                         }
 
@@ -606,8 +879,8 @@ private fun WalletOrGiftCardItem(
                                 .fillMaxWidth()
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp)),
-                            color = if (balanceRatio > 0.2f) accentColor else MaterialTheme.colorScheme.error,
-                            trackColor = accentColor.copy(alpha = 0.2f)
+                            color = if (item.isMarkedAsUsed) MaterialTheme.colorScheme.outlineVariant else if (balanceRatio > 0.2f) accentColor else MaterialTheme.colorScheme.error,
+                            trackColor = accentColor.copy(alpha = 0.15f)
                         )
                     }
                 }

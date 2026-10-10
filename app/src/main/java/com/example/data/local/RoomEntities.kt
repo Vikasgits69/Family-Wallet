@@ -50,7 +50,17 @@ data class CreditCardEntity(
     val supportEmail: String = "",
     val frontCardImagePath: String? = null,
     val backCardImagePath: String? = null,
-    val attachmentPaths: List<String> = emptyList()
+    val attachmentPaths: List<String> = emptyList(),
+    val currentStatementMonth: String = "",
+    val statementOpeningBalance: Double = 0.0,
+    val statementTotalExpenses: Double = 0.0,
+    val statementTotalPayments: Double = 0.0,
+    val statementClosingBalance: Double = 0.0,
+    val statementOpeningRewardPoints: Long = 0L,
+    val statementRewardPointsEarned: Long = 0L,
+    val statementRewardPointsRedeemed: Long = 0L,
+    val statementClosingRewardPoints: Long = 0L,
+    val statementLogsJson: String = ""
 )
 
 @Entity(tableName = "debit_cards")
@@ -128,7 +138,8 @@ data class WalletOrGiftCardEntity(
     val memberId: String = "",
     val colorHex: Long = 0xFFB45309,
     val barcodeOrReceiptImagePath: String? = null,
-    val attachmentPaths: List<String> = emptyList()
+    val attachmentPaths: List<String> = emptyList(),
+    val isMarkedAsUsed: Boolean = false
 )
 
 @Entity(tableName = "documents")

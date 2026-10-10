@@ -102,6 +102,7 @@ fun CardsScreen(
     onDeleteDebitCard: (String) -> Unit,
     onToggleBillPaid: (String) -> Unit = {},
     onOpenHelpline: (String) -> Unit = {},
+    onOpenLogStatement: (CreditCard) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -312,10 +313,13 @@ fun CardsScreen(
                                                     onFlip = { onToggleCardFlip(card.id) },
                                                     onToggleMask = { onToggleItemMask(card.id) },
                                                     memberName = member?.name,
+                                                    cornerRadiusDp = uiState.visualDensityMode.cardCornerRadiusDp,
+                                                    surfaceShader = uiState.cardSurfaceShader,
                                                     onEdit = { onOpenEditCreditCard(card) },
                                                     onDelete = { cardToDelete = Pair(card.id, true) },
                                                     onToggleBillPaid = { onToggleBillPaid(card.id) },
                                                     onOpenHelpline = { onOpenHelpline(card.bankName) },
+                                                    onOpenLogStatement = { onOpenLogStatement(card) },
                                                     modifier = Modifier.widthIn(max = 340.dp)
                                                 )
                                             }
@@ -484,6 +488,8 @@ fun CardsScreen(
                                                     onFlip = { onToggleCardFlip(card.id) },
                                                     onToggleMask = { onToggleItemMask(card.id) },
                                                     memberName = member?.name,
+                                                    cornerRadiusDp = uiState.visualDensityMode.cardCornerRadiusDp,
+                                                    surfaceShader = uiState.cardSurfaceShader,
                                                     onEdit = { onOpenEditDebitCard(card) },
                                                     onDelete = { cardToDelete = Pair(card.id, false) },
                                                     onOpenHelpline = { onOpenHelpline(card.bankName) },
@@ -551,10 +557,13 @@ fun CardsScreen(
                                         onFlip = { onToggleCardFlip(card.id) },
                                         onToggleMask = { onToggleItemMask(card.id) },
                                         memberName = member?.name,
+                                        cornerRadiusDp = uiState.visualDensityMode.cardCornerRadiusDp,
+                                        surfaceShader = uiState.cardSurfaceShader,
                                         onEdit = { onOpenEditCreditCard(card) },
                                         onDelete = { cardToDelete = Pair(card.id, true) },
                                         onToggleBillPaid = { onToggleBillPaid(card.id) },
-                                        onOpenHelpline = { onOpenHelpline(card.bankName) }
+                                        onOpenHelpline = { onOpenHelpline(card.bankName) },
+                                        onOpenLogStatement = { onOpenLogStatement(card) }
                                     )
                                 }
                             }
@@ -568,6 +577,8 @@ fun CardsScreen(
                                         onFlip = { onToggleCardFlip(card.id) },
                                         onToggleMask = { onToggleItemMask(card.id) },
                                         memberName = member?.name,
+                                        cornerRadiusDp = uiState.visualDensityMode.cardCornerRadiusDp,
+                                        surfaceShader = uiState.cardSurfaceShader,
                                         onEdit = { onOpenEditDebitCard(card) },
                                         onDelete = { cardToDelete = Pair(card.id, false) },
                                         onOpenHelpline = { onOpenHelpline(card.bankName) }
@@ -604,10 +615,13 @@ fun CardsScreen(
                                         onFlip = { onToggleCardFlip(card.id) },
                                         onToggleMask = { onToggleItemMask(card.id) },
                                         memberName = member?.name,
+                                        cornerRadiusDp = uiState.visualDensityMode.cardCornerRadiusDp,
+                                        surfaceShader = uiState.cardSurfaceShader,
                                         onEdit = { onOpenEditCreditCard(card) },
                                         onDelete = { cardToDelete = Pair(card.id, true) },
                                         onToggleBillPaid = { onToggleBillPaid(card.id) },
                                         onOpenHelpline = { onOpenHelpline(card.bankName) },
+                                        onOpenLogStatement = { onOpenLogStatement(card) },
                                         modifier = Modifier.widthIn(max = 360.dp)
                                     )
                                 }
@@ -635,6 +649,8 @@ fun CardsScreen(
                                         onFlip = { onToggleCardFlip(card.id) },
                                         onToggleMask = { onToggleItemMask(card.id) },
                                         memberName = member?.name,
+                                        cornerRadiusDp = uiState.visualDensityMode.cardCornerRadiusDp,
+                                        surfaceShader = uiState.cardSurfaceShader,
                                         onEdit = { onOpenEditDebitCard(card) },
                                         onDelete = { cardToDelete = Pair(card.id, false) },
                                         onOpenHelpline = { onOpenHelpline(card.bankName) },

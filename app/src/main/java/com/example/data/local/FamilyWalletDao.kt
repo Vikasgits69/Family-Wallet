@@ -38,6 +38,9 @@ interface FamilyWalletDao {
     @Query("SELECT * FROM credit_cards ORDER BY cardName ASC")
     fun getAllCreditCards(): Flow<List<CreditCardEntity>>
 
+    @Query("SELECT * FROM credit_cards ORDER BY cardName ASC")
+    suspend fun getAllCreditCardsList(): List<CreditCardEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCreditCard(card: CreditCardEntity)
 
@@ -113,6 +116,9 @@ interface FamilyWalletDao {
     @Query("SELECT * FROM wallets_and_gift_cards ORDER BY providerOrName ASC")
     fun getAllWalletsAndGiftCards(): Flow<List<WalletOrGiftCardEntity>>
 
+    @Query("SELECT * FROM wallets_and_gift_cards ORDER BY providerOrName ASC")
+    suspend fun getAllWalletsAndGiftCardsList(): List<WalletOrGiftCardEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWalletOrGiftCard(item: WalletOrGiftCardEntity)
 
@@ -137,6 +143,9 @@ interface FamilyWalletDao {
     // Documents (AADHAAR, PAN, PASSPORT, DRIVING_LICENSE, VOTER_ID, INSURANCE_POLICY, VEHICLE_RC, PROPERTY, OTHER)
     @Query("SELECT * FROM documents ORDER BY title ASC, docNumber ASC")
     fun getAllDocuments(): Flow<List<DocumentEntity>>
+
+    @Query("SELECT * FROM documents ORDER BY title ASC, docNumber ASC")
+    suspend fun getAllDocumentsList(): List<DocumentEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDocument(doc: DocumentEntity)

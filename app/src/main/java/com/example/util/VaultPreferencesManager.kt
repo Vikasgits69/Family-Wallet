@@ -149,6 +149,56 @@ class VaultPreferencesManager(private val context: Context) {
         return getPrefs().getInt(KEY_CLIPBOARD_CLEAR_TIMEOUT, 30)
     }
 
+    fun saveVisualDensityMode(mode: com.example.data.VisualDensityMode) {
+        getPrefs().edit().putString(KEY_VISUAL_DENSITY, mode.name).apply()
+    }
+
+    fun getVisualDensityMode(): com.example.data.VisualDensityMode {
+        val name = getPrefs().getString(KEY_VISUAL_DENSITY, com.example.data.VisualDensityMode.SPACIOUS.name)
+        return try {
+            com.example.data.VisualDensityMode.valueOf(name ?: com.example.data.VisualDensityMode.SPACIOUS.name)
+        } catch (e: Exception) {
+            com.example.data.VisualDensityMode.SPACIOUS
+        }
+    }
+
+    fun saveCardSurfaceShader(shader: com.example.data.CardSurfaceShader) {
+        getPrefs().edit().putString(KEY_CARD_SURFACE_SHADER, shader.name).apply()
+    }
+
+    fun getCardSurfaceShader(): com.example.data.CardSurfaceShader {
+        val name = getPrefs().getString(KEY_CARD_SURFACE_SHADER, com.example.data.CardSurfaceShader.CLASSIC_GRADIENT.name)
+        return try {
+            com.example.data.CardSurfaceShader.valueOf(name ?: com.example.data.CardSurfaceShader.CLASSIC_GRADIENT.name)
+        } catch (e: Exception) {
+            com.example.data.CardSurfaceShader.CLASSIC_GRADIENT
+        }
+    }
+
+    fun saveWifiServerPort(port: Int) {
+        getPrefs().edit().putInt(KEY_WIFI_SERVER_PORT, port).apply()
+    }
+
+    fun getWifiServerPort(): Int {
+        return getPrefs().getInt(KEY_WIFI_SERVER_PORT, 8080)
+    }
+
+    fun saveWifiServerRequirePin(require: Boolean) {
+        getPrefs().edit().putBoolean(KEY_WIFI_SERVER_REQUIRE_PIN, require).apply()
+    }
+
+    fun isWifiServerRequirePin(): Boolean {
+        return getPrefs().getBoolean(KEY_WIFI_SERVER_REQUIRE_PIN, true)
+    }
+
+    fun saveWifiServerPin(pin: String) {
+        getPrefs().edit().putString(KEY_WIFI_SERVER_PIN, pin).apply()
+    }
+
+    fun getWifiServerPin(): String {
+        return getPrefs().getString(KEY_WIFI_SERVER_PIN, "8492") ?: "8492"
+    }
+
     companion object {
         private const val PREF_NAME = "family_wallet_vault_prefs"
         private const val KEY_THEME_MODE = "theme_mode"
@@ -164,5 +214,10 @@ class VaultPreferencesManager(private val context: Context) {
         private const val KEY_INCLUDE_PHOTOS_IN_BACKUP = "include_photos_in_backup"
         private const val KEY_CLIPBOARD_AUTO_CLEAR = "clipboard_auto_clear"
         private const val KEY_CLIPBOARD_CLEAR_TIMEOUT = "clipboard_clear_timeout"
+        private const val KEY_VISUAL_DENSITY = "visual_density"
+        private const val KEY_CARD_SURFACE_SHADER = "card_surface_shader"
+        private const val KEY_WIFI_SERVER_PORT = "wifi_server_port"
+        private const val KEY_WIFI_SERVER_REQUIRE_PIN = "wifi_server_require_pin"
+        private const val KEY_WIFI_SERVER_PIN = "wifi_server_pin"
     }
 }

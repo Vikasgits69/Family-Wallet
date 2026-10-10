@@ -16,7 +16,7 @@ import androidx.room.TypeConverters
         DocumentEntity::class,
         SubscriptionEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(VaultTypeConverters::class)

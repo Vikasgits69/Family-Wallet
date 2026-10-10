@@ -44,7 +44,7 @@ import com.example.data.WalletOrGiftCard
 fun SpendGiftCardDialog(
     giftCard: WalletOrGiftCard,
     onDismiss: () -> Unit,
-    onConfirmSpend: (Double) -> Unit
+    onConfirmSpend: (Double, String) -> Unit
 ) {
     var spendAmountText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
@@ -173,7 +173,7 @@ fun SpendGiftCardDialog(
                 Button(
                     onClick = {
                         if (amountDouble > 0) {
-                            onConfirmSpend(amountDouble)
+                            onConfirmSpend(amountDouble, noteText.trim())
                             onDismiss()
                         }
                     },

@@ -61,15 +61,19 @@ enum class AppThemeMode(
     EMERALD_VAULT("Emerald Vault", "Swiss private banking, jade & gold accents", "🌲", ThemeCategory.LUXURY, true),
     MIDNIGHT_ROSE("Midnight Rose", "Plum velvet with electric rose & amethyst", "🌹", ThemeCategory.LUXURY, true),
     PLATINUM_LUXURY("Titanium Luxury", "Matte gunmetal, titanium gray & chrome", "💎", ThemeCategory.LUXURY, true),
+    SWISS_GOLD("Swiss Gold & Onyx", "Bespoke private bank 24k gold on pitch obsidian", "🪙", ThemeCategory.LUXURY, true),
 
     DOODLE("Doodle Light", "Hand-drawn playful notebook & pastel markers", "🎨", ThemeCategory.ARTISTIC, false),
     DOODLE_DARK("Doodle Dark", "Chalkboard & neon gel pens on slate", "✏️", ThemeCategory.ARTISTIC, true),
     PAPERLIKE("Paperlike", "Warm cream editorial Notion parchment", "📜", ThemeCategory.ARTISTIC, false),
+    WARM_ESPRESSO("Warm Espresso", "Cozy roasted coffee, oat milk cream & hazelnut", "☕", ThemeCategory.ARTISTIC, false),
+    SAKURA_BLOSSOM("Sakura Blossom", "Japanese cherry blossom blush, cream & plum", "🌸", ThemeCategory.ARTISTIC, false),
 
     CYBER_NEON("Cyber Neon", "Synthwave cosmic navy with glowing cyan & purple", "🌌", ThemeCategory.VIBE, true),
     NORDIC_FROST("Nordic Frost", "Minimalist arctic glacial blue & ice slate", "❄️", ThemeCategory.VIBE, false),
     SUNSET_AMBER("Sunset Amber", "Warm terracotta copper, sand & desert gold", "🌇", ThemeCategory.VIBE, false),
     MATCHA_SAGE("Matcha & Sage", "Soothing calm organic herbal tea & olive", "🍵", ThemeCategory.VIBE, false),
+    RETRO_TERMINAL("Retro 80s CRT", "Vintage amber-green phosphor terminal on phosphor black", "👾", ThemeCategory.VIBE, true),
     HIGH_CONTRAST("High Contrast", "WCAG AAA cyber neon yellow & stark cyan", "⚡", ThemeCategory.VIBE, true)
 }
 
@@ -95,6 +99,21 @@ data class FamilyMember(
     val emergencyPhone: String = "",
     val bloodGroup: String = "",
     val initials: String = name.take(2).uppercase().ifBlank { "FM" }
+)
+
+data class CreditCardStatementLog(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val statementMonth: String = "", // e.g. "October 2026"
+    val openingBalance: Double = 0.0,
+    val totalExpenses: Double = 0.0,
+    val totalPayments: Double = 0.0,
+    val closingBalance: Double = 0.0,
+    val openingRewardPoints: Long = 0L,
+    val rewardPointsEarned: Long = 0L,
+    val rewardPointsRedeemedOrLapsed: Long = 0L,
+    val closingRewardPoints: Long = 0L,
+    val notes: String = "",
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 data class CreditCard(
@@ -129,10 +148,64 @@ data class CreditCard(
     val supportEmail: String = "",
     val frontCardImagePath: String? = null,
     val backCardImagePath: String? = null,
-    val attachmentPaths: List<String> = emptyList()
+    val attachmentPaths: List<String> = emptyList(),
+    // Statement Cycle & Reward Points Accounting
+    val currentStatementMonth: String = "",
+    val statementOpeningBalance: Double = 0.0,
+    val statementTotalExpenses: Double = 0.0,
+    val statementTotalPayments: Double = 0.0,
+    val statementClosingBalance: Double = 0.0,
+    val statementOpeningRewardPoints: Long = 0L,
+    val statementRewardPointsEarned: Long = 0L,
+    val statementRewardPointsRedeemed: Long = 0L,
+    val statementClosingRewardPoints: Long = 0L,
+    val statementLogsJson: String = ""
 ) {
     val dailyAtmLimit: Long get() = atmDailyLimit
     val internationalUsage: Boolean get() = internationalEnabled
+
+    val parsedStatementLogs: List<CreditCardStatementLog>
+        get() {
+            if (statementLogsJson.isBlank()) return emptyList()
+            return try {
+                val arr = org.json.JSONArray(statementLogsJson)
+                val list = mutableListOf<CreditCardStatementLog>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    list.add(
+                        CreditCardStatementLog(
+                            id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                            statementMonth = obj.optString("statementMonth", ""),
+                            openingBalance = obj.optDouble("openingBalance", 0.0),
+                            totalExpenses = obj.optDouble("totalExpenses", 0.0),
+                            totalPayments = obj.optDouble("totalPayments", 0.0),
+                            closingBalance = obj.optDouble("closingBalance", 0.0),
+                            openingRewardPoints = obj.optLong("openingRewardPoints", 0L),
+                            rewardPointsEarned = obj.optLong("rewardPointsEarned", 0L),
+                            rewardPointsRedeemedOrLapsed = obj.optLong("rewardPointsRedeemedOrLapsed", 0L),
+                            closingRewardPoints = obj.optLong("closingRewardPoints", 0L),
+                            notes = obj.optString("notes", ""),
+                            timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                        )
+                    )
+                }
+                list.sortedByDescending { it.timestamp }
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+
+    val currentOutstandingBalance: Double
+        get() {
+            val latest = parsedStatementLogs.firstOrNull()
+            return latest?.closingBalance ?: statementClosingBalance
+        }
+
+    val currentEffectiveRewardPoints: Long
+        get() {
+            val latest = parsedStatementLogs.firstOrNull()
+            return latest?.closingRewardPoints ?: (if (ccRewardPoints > 0) ccRewardPoints else statementClosingRewardPoints)
+        }
 }
 
 data class DebitCard(
@@ -238,7 +311,8 @@ data class WalletOrGiftCard(
     val memberId: String = "",
     val colorHex: Long = 0xFFB45309,
     val barcodeOrReceiptImagePath: String? = null,
-    val attachmentPaths: List<String> = emptyList()
+    val attachmentPaths: List<String> = emptyList(),
+    val isMarkedAsUsed: Boolean = false
 )
 
 data class Subscription(
@@ -313,7 +387,17 @@ fun CreditCardEntity.toDomain() = CreditCard(
     supportEmail = supportEmail,
     frontCardImagePath = frontCardImagePath,
     backCardImagePath = backCardImagePath,
-    attachmentPaths = attachmentPaths
+    attachmentPaths = attachmentPaths,
+    currentStatementMonth = currentStatementMonth,
+    statementOpeningBalance = statementOpeningBalance,
+    statementTotalExpenses = statementTotalExpenses,
+    statementTotalPayments = statementTotalPayments,
+    statementClosingBalance = statementClosingBalance,
+    statementOpeningRewardPoints = statementOpeningRewardPoints,
+    statementRewardPointsEarned = statementRewardPointsEarned,
+    statementRewardPointsRedeemed = statementRewardPointsRedeemed,
+    statementClosingRewardPoints = statementClosingRewardPoints,
+    statementLogsJson = statementLogsJson
 )
 
 fun CreditCard.toEntity() = CreditCardEntity(
@@ -347,7 +431,17 @@ fun CreditCard.toEntity() = CreditCardEntity(
     supportEmail = supportEmail,
     frontCardImagePath = frontCardImagePath,
     backCardImagePath = backCardImagePath,
-    attachmentPaths = attachmentPaths
+    attachmentPaths = attachmentPaths,
+    currentStatementMonth = currentStatementMonth,
+    statementOpeningBalance = statementOpeningBalance,
+    statementTotalExpenses = statementTotalExpenses,
+    statementTotalPayments = statementTotalPayments,
+    statementClosingBalance = statementClosingBalance,
+    statementOpeningRewardPoints = statementOpeningRewardPoints,
+    statementRewardPointsEarned = statementRewardPointsEarned,
+    statementRewardPointsRedeemed = statementRewardPointsRedeemed,
+    statementClosingRewardPoints = statementClosingRewardPoints,
+    statementLogsJson = statementLogsJson
 )
 
 fun DebitCardEntity.toDomain() = DebitCard(
@@ -494,9 +588,9 @@ fun WalletOrGiftCardEntity.toDomain() = WalletOrGiftCard(
     giftCardPin = giftCardPin,
     vendorName = vendorName,
     remindExpiry = remindExpiry,
-    amount = amount,
-    initialAmount = if (initialAmount > 0) initialAmount else amount,
-    currentBalance = if (currentBalance > 0) currentBalance else amount,
+    amount = if (isMarkedAsUsed || currentBalance > 0.0) currentBalance else amount,
+    initialAmount = if (initialAmount > 0.0) initialAmount else (if (amount > 0.0) amount else currentBalance),
+    currentBalance = if (isMarkedAsUsed) 0.0 else (if (currentBalance > 0.0) currentBalance else (if (initialAmount > 0.0) initialAmount else amount)),
     expiryDate = expiryDate,
     modeOfRedemption = modeOfRedemption,
     remarks = remarks,
@@ -505,7 +599,8 @@ fun WalletOrGiftCardEntity.toDomain() = WalletOrGiftCard(
     memberId = memberId,
     colorHex = colorHex,
     barcodeOrReceiptImagePath = barcodeOrReceiptImagePath,
-    attachmentPaths = attachmentPaths
+    attachmentPaths = attachmentPaths,
+    isMarkedAsUsed = isMarkedAsUsed
 )
 
 fun WalletOrGiftCard.toEntity() = WalletOrGiftCardEntity(
@@ -516,9 +611,9 @@ fun WalletOrGiftCard.toEntity() = WalletOrGiftCardEntity(
     giftCardPin = giftCardPin,
     vendorName = vendorName,
     remindExpiry = remindExpiry,
-    amount = amount,
-    initialAmount = if (initialAmount > 0) initialAmount else amount,
-    currentBalance = if (currentBalance > 0) currentBalance else amount,
+    amount = if (isMarkedAsUsed) 0.0 else currentBalance,
+    initialAmount = if (initialAmount > 0.0) initialAmount else amount,
+    currentBalance = if (isMarkedAsUsed) 0.0 else currentBalance,
     expiryDate = expiryDate,
     modeOfRedemption = modeOfRedemption,
     remarks = remarks,
@@ -527,7 +622,8 @@ fun WalletOrGiftCard.toEntity() = WalletOrGiftCardEntity(
     memberId = memberId,
     colorHex = colorHex,
     barcodeOrReceiptImagePath = barcodeOrReceiptImagePath,
-    attachmentPaths = attachmentPaths
+    attachmentPaths = attachmentPaths,
+    isMarkedAsUsed = isMarkedAsUsed
 )
 
 fun SubscriptionEntity.toDomain() = Subscription(

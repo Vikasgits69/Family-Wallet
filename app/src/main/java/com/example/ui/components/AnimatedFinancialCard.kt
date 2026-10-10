@@ -11,6 +11,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Refresh
@@ -55,11 +57,13 @@ import androidx.fragment.app.FragmentActivity
 import com.example.security.BiometricAuthManager
 import com.example.util.SafeVaultShareManager
 import com.example.util.VaultPreferencesManager
+import com.example.ui.theme.IndigoAccent
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -134,11 +138,14 @@ fun InteractiveCreditCardItem(
     onToggleMask: () -> Unit,
     modifier: Modifier = Modifier,
     memberName: String? = null,
+    cornerRadiusDp: Int = 20,
+    surfaceShader: com.example.data.CardSurfaceShader = com.example.data.CardSurfaceShader.CLASSIC_GRADIENT,
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onCopyNumber: (() -> Unit)? = null,
     onToggleBillPaid: (() -> Unit)? = null,
-    onOpenHelpline: (() -> Unit)? = null
+    onOpenHelpline: (() -> Unit)? = null,
+    onOpenLogStatement: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
@@ -174,7 +181,7 @@ fun InteractiveCreditCardItem(
                     onFlip()
                 }
                 .testTag("credit_card_${card.id}"),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(cornerRadiusDp.dp),
             colors = CardDefaults.cardColors(containerColor = Color(card.colorHex)),
             border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
@@ -184,6 +191,12 @@ fun InteractiveCreditCardItem(
                     .fillMaxSize()
                     .background(brush)
             ) {
+                // Tactical Surface Texture / Shader Layer
+                CardTextureShaderOverlay(
+                    shader = surfaceShader,
+                    baseColor = Color(card.colorHex)
+                )
+
                 if (isFrontVisible) {
                     CreditCardFrontView(
                         card = card,
@@ -246,7 +259,9 @@ fun InteractiveCreditCardItem(
             isUnmasked = isUnmasked,
             onCopy = { label, text -> copyToClipboard(context, label, text) },
             onToggleBillPaid = onToggleBillPaid,
-            onOpenHelpline = onOpenHelpline
+            onOpenHelpline = onOpenHelpline,
+            creditCard = card,
+            onOpenLogStatement = onOpenLogStatement
         )
     }
 }
@@ -264,6 +279,8 @@ fun InteractiveDebitCardItem(
     onToggleMask: () -> Unit,
     modifier: Modifier = Modifier,
     memberName: String? = null,
+    cornerRadiusDp: Int = 20,
+    surfaceShader: com.example.data.CardSurfaceShader = com.example.data.CardSurfaceShader.CLASSIC_GRADIENT,
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onCopyNumber: (() -> Unit)? = null,
@@ -303,7 +320,7 @@ fun InteractiveDebitCardItem(
                     onFlip()
                 }
                 .testTag("debit_card_${card.id}"),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(cornerRadiusDp.dp),
             colors = CardDefaults.cardColors(containerColor = Color(card.colorHex)),
             border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
@@ -313,6 +330,12 @@ fun InteractiveDebitCardItem(
                     .fillMaxSize()
                     .background(brush)
             ) {
+                // Tactical Surface Texture / Shader Layer
+                CardTextureShaderOverlay(
+                    shader = surfaceShader,
+                    baseColor = Color(card.colorHex)
+                )
+
                 if (isFrontVisible) {
                     DebitCardFrontView(
                         card = card,
@@ -452,7 +475,7 @@ private fun CreditCardFrontView(
             }
         }
 
-        // Row 2: Chip and CC Reward Points
+        // Row 2: Chip, Statement Balance, and CC Reward Points
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -460,21 +483,45 @@ private fun CreditCardFrontView(
         ) {
             EmvChipGraphic()
 
-            if (card.ccRewardPoints > 0) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.18f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Icon(Icons.Default.Stars, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(13.dp))
-                    Text(
-                        text = "${card.ccRewardPoints} pts",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                        color = Color.White
-                    )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (card.currentOutstandingBalance > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0F172A).copy(alpha = 0.75f))
+                            .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "Bal ₹${card.currentOutstandingBalance.toInt()}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.sp),
+                            color = Color(0xFFFDE047)
+                        )
+                    }
+                }
+
+                val pts = card.currentEffectiveRewardPoints
+                if (pts > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.18f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Icon(Icons.Default.Stars, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(13.dp))
+                        Text(
+                            text = "$pts pts",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }
@@ -1177,7 +1224,9 @@ fun CardExpandedDetailsView(
     isUnmasked: Boolean,
     onCopy: (String, String) -> Unit,
     onToggleBillPaid: (() -> Unit)? = null,
-    onOpenHelpline: (() -> Unit)? = null
+    onOpenHelpline: (() -> Unit)? = null,
+    creditCard: CreditCard? = null,
+    onOpenLogStatement: (() -> Unit)? = null
 ) {
     val accent = Color(colorHex)
     val context = LocalContext.current
@@ -1558,6 +1607,82 @@ fun CardExpandedDetailsView(
                                     Column(modifier = Modifier.padding(8.dp)) {
                                         Text("PAYMENT DUE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text(dueDate, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Statement Cycle & Expenses Accounting Dossier
+                    if (isCredit) {
+                        val curMonth = creditCard?.currentStatementMonth?.ifBlank { "Current Statement Month" } ?: "Current Statement Month"
+                        val outBal = creditCard?.currentOutstandingBalance ?: 0.0
+                        val exp = creditCard?.statementTotalExpenses ?: 0.0
+                        val pmt = creditCard?.statementTotalPayments ?: 0.0
+                        val pts = creditCard?.currentEffectiveRewardPoints ?: 0L
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = IndigoAccent.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, IndigoAccent.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = IndigoAccent, modifier = Modifier.size(16.dp))
+                                        Text(
+                                            text = "STATEMENT & EXPENSES",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
+                                            color = IndigoAccent
+                                        )
+                                    }
+
+                                    if (onOpenLogStatement != null) {
+                                        FilledTonalButton(
+                                            onClick = onOpenLogStatement,
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.height(28.dp),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("+ Log Statement", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(curMonth, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                                        Text("Expenses: ₹${exp.toInt()} • Payments: ₹${pmt.toInt()}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("₹${outBal.toInt()}", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black), color = IndigoAccent)
+                                        Text("Rolling Balance", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+
+                                if (pts > 0L) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Reward Points Available:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("$pts pts", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFFD97706))
                                     }
                                 }
                             }

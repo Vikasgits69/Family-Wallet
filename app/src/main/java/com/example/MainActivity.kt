@@ -52,8 +52,16 @@ import com.example.ui.screens.AddSubscriptionDialog
 import com.example.ui.components.EmergencyHelplineSheet
 import com.example.ui.components.EmergencyIceDialog
 import com.example.ui.components.SecurityCheckupDialog
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.example.ui.components.LogCreditCardStatementDialog
 import com.example.ui.components.SpendGiftCardDialog
 import com.example.ui.components.UpiQrDialog
+import com.example.ui.dialogs.WifiServerDialog
 import com.example.ui.theme.FamilyWalletTheme
 import com.example.ui.viewmodel.FamilyWalletViewModel
 
@@ -146,6 +154,28 @@ fun FamilyWalletApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
+    // Request Notification Permission on Android 13+ (API 33+)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val permissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            if (isGranted) {
+                viewModel.scanAndTriggerDueReminders()
+            }
+        }
+        LaunchedEffect(Unit) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                viewModel.scanAndTriggerDueReminders()
+            }
+        }
+    } else {
+        LaunchedEffect(Unit) {
+            viewModel.scanAndTriggerDueReminders()
+        }
+    }
+
     // Display Notification messages via Snackbar
     LaunchedEffect(state.notificationMessage) {
         state.notificationMessage?.let { message ->
@@ -186,7 +216,8 @@ fun FamilyWalletApp(
                     onSetDisplayMode = { mode -> viewModel.setDisplayMode(mode) },
                     onSetThemeMode = { mode -> viewModel.setThemeMode(mode) },
                     onSetCustomAccent = { hex -> viewModel.setCustomAccentColor(hex) },
-                    onNavigateTab = { tab -> viewModel.setNavigationTab(tab) }
+                    onNavigateTab = { tab -> viewModel.setNavigationTab(tab) },
+                    onOpenWifiServer = { viewModel.setWifiServerDialogVisible(true) }
                 )
             },
             bottomBar = {
@@ -223,7 +254,8 @@ fun FamilyWalletApp(
                             onOpenAddMember = { viewModel.setAddMemberDialogVisible(true) },
                             onOpenEmergencyIce = { viewModel.openEmergencyIce() },
                             onOpenSecurityCheckup = { viewModel.openSecurityCheckup() },
-                            onOpenHelplines = { viewModel.openHelplines() }
+                            onOpenHelplines = { viewModel.openHelplines() },
+                            onOpenWifiServer = { viewModel.setWifiServerDialogVisible(true) }
                         )
 
                         NavigationTab.CARDS -> CardsScreen(
@@ -237,7 +269,8 @@ fun FamilyWalletApp(
                             onDeleteCreditCard = { id -> viewModel.deleteCreditCard(id) },
                             onDeleteDebitCard = { id -> viewModel.deleteDebitCard(id) },
                             onToggleBillPaid = { cardId -> viewModel.toggleCreditCardBillPaid(cardId) },
-                            onOpenHelpline = { bankName -> viewModel.openHelplines(bankName) }
+                            onOpenHelpline = { bankName -> viewModel.openHelplines(bankName) },
+                            onOpenLogStatement = { card -> viewModel.openLogStatement(card) }
                         )
 
                         NavigationTab.ACCOUNTS -> AccountsScreen(
@@ -257,7 +290,8 @@ fun FamilyWalletApp(
                             onOpenEditSubscription = { sub -> viewModel.openEditSubscription(sub) },
                             onDeleteSubscription = { id -> viewModel.deleteSubscription(id) },
                             onOpenSpendGiftCard = { item -> viewModel.openSpendGiftCard(item) },
-                            onShowUpiQr = { vpa, name -> viewModel.showUpiQr(vpa, name) }
+                            onShowUpiQr = { vpa, name -> viewModel.showUpiQr(vpa, name) },
+                            onToggleMarkedAsUsed = { id -> viewModel.toggleGiftCardMarkedAsUsed(id) }
                         )
 
                         NavigationTab.DOCUMENTS -> DocsVaultScreen(
@@ -288,6 +322,8 @@ fun FamilyWalletApp(
                             uiState = state,
                             onSetThemeMode = { mode -> viewModel.setThemeMode(mode) },
                             onSetCustomAccent = { hex -> viewModel.setCustomAccentColor(hex) },
+                            onSetVisualDensityMode = { mode -> viewModel.setVisualDensityMode(mode) },
+                            onSetCardSurfaceShader = { shader -> viewModel.setCardSurfaceShader(shader) },
                             onToggleBiometric = { viewModel.toggleBiometricEnabled() },
                             onLockApp = { viewModel.lockApp() },
                             onSyncGoogleDrive = { viewModel.syncWithGoogleDrive() },
@@ -317,7 +353,9 @@ fun FamilyWalletApp(
                                 }
                             },
                             onLoadBackups = { viewModel.loadAvailableDriveBackups() },
-                            onRestoreSpecificBackup = { fileName -> viewModel.restoreSpecificDriveBackup(fileName) }
+                            onRestoreSpecificBackup = { fileName -> viewModel.restoreSpecificDriveBackup(fileName) },
+                            onOpenWifiServer = { viewModel.setWifiServerDialogVisible(true) },
+                            onToggleWifiServer = { viewModel.toggleWifiServer() }
                         )
                     }
                 }
@@ -427,7 +465,27 @@ fun FamilyWalletApp(
         SpendGiftCardDialog(
             giftCard = giftCard,
             onDismiss = { viewModel.closeSpendGiftCard() },
-            onConfirmSpend = { amount -> viewModel.deductGiftCardBalance(giftCard.id, amount) }
+            onConfirmSpend = { amount, remarks -> viewModel.deductGiftCardBalance(giftCard.id, amount, remarks) }
+        )
+    }
+
+    state.loggingStatementCard?.let { card ->
+        LogCreditCardStatementDialog(
+            card = card,
+            onDismiss = { viewModel.closeLogStatement() },
+            onSaveStatement = { log -> viewModel.saveCreditCardStatementLog(card.id, log) }
+        )
+    }
+
+    if (state.showWifiServerDialog) {
+        WifiServerDialog(
+            uiState = state,
+            onToggleServer = { viewModel.toggleWifiServer() },
+            onSetPort = { port -> viewModel.setWifiServerPort(port) },
+            onToggleRequirePin = { require -> viewModel.setWifiServerRequirePin(require) },
+            onGenerateNewPin = { viewModel.generateNewWifiServerPin() },
+            onClearLogs = { viewModel.clearWifiLogs() },
+            onDismiss = { viewModel.setWifiServerDialogVisible(false) }
         )
     }
 }

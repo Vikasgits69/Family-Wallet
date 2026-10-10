@@ -310,6 +310,90 @@ private val MatchaSageColorScheme = lightColorScheme(
     outlineVariant = Color(0xFFE5EDE0)
 )
 
+private val SwissGoldColorScheme = darkColorScheme(
+    primary = Color(0xFFE5B94E), // 24k Polished Swiss Gold
+    onPrimary = Color(0xFF1C1605),
+    primaryContainer = Color(0xFF3B2F0B),
+    onPrimaryContainer = Color(0xFFFDE68A),
+    secondary = Color(0xFFD4AF37), // Metallic Gold
+    onSecondary = Color(0xFF1C1605),
+    secondaryContainer = Color(0xFF261E0A),
+    onSecondaryContainer = Color(0xFFFEF3C7),
+    tertiary = Color(0xFFFBBF24),
+    onTertiary = Color(0xFF2E1A02),
+    background = Color(0xFF0A0A0A), // Onyx Black
+    onBackground = Color(0xFFFAF7EE),
+    surface = Color(0xFF121212), // Deep Obsidian
+    onSurface = Color(0xFFFAF7EE),
+    surfaceVariant = Color(0xFF1E1E1E),
+    onSurfaceVariant = Color(0xFFD4AF37),
+    outline = Color(0x66D4AF37),
+    outlineVariant = Color(0x33D4AF37)
+)
+
+private val WarmEspressoColorScheme = lightColorScheme(
+    primary = Color(0xFF6F4E37), // Rich Roasted Espresso
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFEFE8E1), // Warm Oat Milk Foam
+    onPrimaryContainer = Color(0xFF3E2723),
+    secondary = Color(0xFF8D6E63), // Roasted Hazelnut
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFD7CCC8),
+    onSecondaryContainer = Color(0xFF2D1B17),
+    tertiary = Color(0xFFA1887F),
+    onTertiary = Color.White,
+    background = Color(0xFFFBF8F5), // Soft Cream Canvas
+    onBackground = Color(0xFF2A1F1D),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF2A1F1D),
+    surfaceVariant = Color(0xFFF3EDE7),
+    onSurfaceVariant = Color(0xFF5D4037),
+    outline = Color(0xFFD7CCC8),
+    outlineVariant = Color(0xFFEFEBE9)
+)
+
+private val SakuraBlossomColorScheme = lightColorScheme(
+    primary = Color(0xFFE11D74), // Vivid Cherry Blossom Pink
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE4EC), // Soft Sakura Blush
+    onPrimaryContainer = Color(0xFF700B33),
+    secondary = Color(0xFF9D174D), // Deep Plum
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFCE7F3),
+    onSecondaryContainer = Color(0xFF500720),
+    tertiary = Color(0xFFF472B6),
+    onTertiary = Color.White,
+    background = Color(0xFFFFF7F9), // Pearl Sakura Background
+    onBackground = Color(0xFF280B16),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF280B16),
+    surfaceVariant = Color(0xFFFDE8EF),
+    onSurfaceVariant = Color(0xFF6B213D),
+    outline = Color(0xFFFBCFE8),
+    outlineVariant = Color(0xFFFDF2F8)
+)
+
+private val RetroTerminalColorScheme = darkColorScheme(
+    primary = Color(0xFF22C55E), // CRT Green Phosphor
+    onPrimary = Color(0xFF021B0B),
+    primaryContainer = Color(0xFF052E16),
+    onPrimaryContainer = Color(0xFF86EFAC),
+    secondary = Color(0xFFF59E0B), // CRT Amber Secondary
+    onSecondary = Color(0xFF261502),
+    secondaryContainer = Color(0xFF451A03),
+    onSecondaryContainer = Color(0xFFFDE68A),
+    tertiary = Color(0xFF10B981),
+    onTertiary = Color(0xFF022C22),
+    background = Color(0xFF030A05), // Phosphor CRT Black
+    onBackground = Color(0xFFDCFCE7),
+    surface = Color(0xFF06140A),
+    onSurface = Color(0xFFDCFCE7),
+    surfaceVariant = Color(0xFF0B2312),
+    onSurfaceVariant = Color(0xFF4ADE80),
+    outline = Color(0x6622C55E),
+    outlineVariant = Color(0x3322C55E)
+)
+
 fun parseHexColor(hexString: String?): Color? {
     if (hexString.isNullOrBlank()) return null
     return try {
@@ -351,6 +435,10 @@ fun FamilyWalletTheme(
         AppThemeMode.EMERALD_VAULT -> EmeraldVaultColorScheme
         AppThemeMode.MIDNIGHT_ROSE -> MidnightRoseColorScheme
         AppThemeMode.PLATINUM_LUXURY -> PlatinumLuxuryColorScheme
+        AppThemeMode.SWISS_GOLD -> SwissGoldColorScheme
+        AppThemeMode.WARM_ESPRESSO -> WarmEspressoColorScheme
+        AppThemeMode.SAKURA_BLOSSOM -> SakuraBlossomColorScheme
+        AppThemeMode.RETRO_TERMINAL -> RetroTerminalColorScheme
         AppThemeMode.CYBER_NEON -> CyberNeonColorScheme
         AppThemeMode.NORDIC_FROST -> NordicFrostColorScheme
         AppThemeMode.SUNSET_AMBER -> SunsetAmberColorScheme

@@ -36,6 +36,10 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -51,6 +55,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -78,6 +83,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import com.example.data.AppThemeMode
 import com.example.data.ThemeCategory
+import com.example.data.VisualDensityMode
+import com.example.data.CardSurfaceShader
+import com.example.ui.components.CardTextureShaderOverlay
 import com.example.ui.components.CustomColorPickerDialog
 import com.example.ui.components.GoogleDriveSyncCard
 import com.example.ui.theme.EmeraldMint
@@ -90,6 +98,8 @@ fun SettingsScreen(
     uiState: FamilyWalletUiState,
     onSetThemeMode: (AppThemeMode) -> Unit,
     onSetCustomAccent: (String?) -> Unit = {},
+    onSetVisualDensityMode: (VisualDensityMode) -> Unit = {},
+    onSetCardSurfaceShader: (CardSurfaceShader) -> Unit = {},
     onToggleBiometric: () -> Unit,
     onLockApp: () -> Unit,
     onSyncGoogleDrive: () -> Unit,
@@ -105,6 +115,8 @@ fun SettingsScreen(
     onImportJson: (String) -> Unit = {},
     onLoadBackups: () -> Unit = {},
     onRestoreSpecificBackup: (String) -> Unit = {},
+    onOpenWifiServer: () -> Unit = {},
+    onToggleWifiServer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedCategory by remember { mutableStateOf(ThemeCategory.ALL) }
@@ -338,6 +350,10 @@ fun SettingsScreen(
                                 AppThemeMode.EMERALD_VAULT -> Brush.verticalGradient(listOf(Color(0xFF0B382D), Color(0xFF041712)))
                                 AppThemeMode.MIDNIGHT_ROSE -> Brush.verticalGradient(listOf(Color(0xFF2B1437), Color(0xFF0F0713)))
                                 AppThemeMode.PLATINUM_LUXURY -> Brush.verticalGradient(listOf(Color(0xFF20252D), Color(0xFF0B0D10)))
+                                AppThemeMode.SWISS_GOLD -> Brush.verticalGradient(listOf(Color(0xFF221A08), Color(0xFF0A0A0A)))
+                                AppThemeMode.WARM_ESPRESSO -> Brush.verticalGradient(listOf(Color(0xFFFBF8F5), Color(0xFFEFE8E1)))
+                                AppThemeMode.SAKURA_BLOSSOM -> Brush.verticalGradient(listOf(Color(0xFFFFF7F9), Color(0xFFFFE4EC)))
+                                AppThemeMode.RETRO_TERMINAL -> Brush.verticalGradient(listOf(Color(0xFF030A05), Color(0xFF052E16)))
                                 AppThemeMode.CYBER_NEON -> Brush.verticalGradient(listOf(Color(0xFF131A3E), Color(0xFF060814)))
                                 AppThemeMode.NORDIC_FROST -> Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFE0F2FE)))
                                 AppThemeMode.SUNSET_AMBER -> Brush.verticalGradient(listOf(Color(0xFFFFF7ED), Color(0xFFFAF5EE)))
@@ -347,7 +363,10 @@ fun SettingsScreen(
 
                             val previewTextColor = when (mode) {
                                 AppThemeMode.DOODLE, AppThemeMode.LIGHT, AppThemeMode.PAPERLIKE,
-                                AppThemeMode.NORDIC_FROST, AppThemeMode.SUNSET_AMBER, AppThemeMode.MATCHA_SAGE -> Color(0xFF1E293B)
+                                AppThemeMode.NORDIC_FROST, AppThemeMode.SUNSET_AMBER, AppThemeMode.MATCHA_SAGE,
+                                AppThemeMode.WARM_ESPRESSO, AppThemeMode.SAKURA_BLOSSOM -> Color(0xFF1E293B)
+                                AppThemeMode.SWISS_GOLD -> Color(0xFFFDE68A)
+                                AppThemeMode.RETRO_TERMINAL -> Color(0xFF86EFAC)
                                 else -> Color(0xFFF8FAFC)
                             }
 
@@ -432,6 +451,10 @@ fun SettingsScreen(
                                                 AppThemeMode.EMERALD_VAULT -> listOf(Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFF34D399))
                                                 AppThemeMode.MIDNIGHT_ROSE -> listOf(Color(0xFFF43F5E), Color(0xFFA855F7), Color(0xFFFB7185))
                                                 AppThemeMode.PLATINUM_LUXURY -> listOf(Color(0xFFCBD5E1), Color(0xFF94A3B8), Color(0xFFE2E8F0))
+                                                AppThemeMode.SWISS_GOLD -> listOf(Color(0xFFE5B94E), Color(0xFFD4AF37), Color(0xFFFBBF24))
+                                                AppThemeMode.WARM_ESPRESSO -> listOf(Color(0xFF6F4E37), Color(0xFF8D6E63), Color(0xFFD7CCC8))
+                                                AppThemeMode.SAKURA_BLOSSOM -> listOf(Color(0xFFE11D74), Color(0xFF9D174D), Color(0xFFF472B6))
+                                                AppThemeMode.RETRO_TERMINAL -> listOf(Color(0xFF22C55E), Color(0xFFF59E0B), Color(0xFF4ADE80))
                                                 AppThemeMode.CYBER_NEON -> listOf(Color(0xFF00F5FF), Color(0xFFD946EF), Color(0xFF38BDF8))
                                                 AppThemeMode.NORDIC_FROST -> listOf(Color(0xFF0284C7), Color(0xFF0EA5E9), Color(0xFF64748B))
                                                 AppThemeMode.SUNSET_AMBER -> listOf(Color(0xFFEA580C), Color(0xFFD97706), Color(0xFFB45309))
@@ -463,6 +486,135 @@ fun SettingsScreen(
                 currentAccentHex = uiState.customAccentColorHex,
                 onSetCustomAccent = onSetCustomAccent
             )
+        }
+
+        // 1.6. Visual Density Mode (Spacious Modern vs Compact Pro)
+        item {
+            VisualDensitySelectorCard(
+                currentDensity = uiState.visualDensityMode,
+                onSelectDensity = onSetVisualDensityMode
+            )
+        }
+
+        // 1.7. Card Surface Shaders & Tactile Textures
+        item {
+            CardSurfaceShaderSelectorCard(
+                currentShader = uiState.cardSurfaceShader,
+                onSelectShader = onSetCardSurfaceShader
+            )
+        }
+
+        // 1.8. Local Wi-Fi Web Server (Two-Way Sync with Browser)
+        item {
+            OutlinedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("wifi_server_settings_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (uiState.isWifiServerRunning) EmeraldMint.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(if (uiState.isWifiServerRunning) EmeraldMint.copy(alpha = 0.15f) else IndigoAccent.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (uiState.isWifiServerRunning) Icons.Default.Wifi else Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = if (uiState.isWifiServerRunning) EmeraldMint else IndigoAccent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Local Wi-Fi Web Server",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    if (uiState.isWifiServerRunning) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(EmeraldMint)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = if (uiState.isWifiServerRunning)
+                                        "Running at ${uiState.wifiServerUrl ?: "local network"}"
+                                    else
+                                        "Load & edit vault on browser over Wi-Fi",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = uiState.isWifiServerRunning,
+                            onCheckedChange = { onToggleWifiServer() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = EmeraldMint
+                            ),
+                            modifier = Modifier.testTag("wifi_server_switch_settings")
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onOpenWifiServer,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                if (uiState.isWifiServerRunning) "Manage Web Access & PIN" else "Configure Web Companion",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // 2. Google Drive Cloud Sync & Encrypted Vault Restore
@@ -1394,4 +1546,276 @@ fun CustomAccentColorCard(
 private fun hsvToHex(h: Float, s: Float, v: Float): String {
     val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(h, s, v))
     return String.format("#%06X", 0xFFFFFF and colorInt)
+}
+
+@Composable
+private fun VisualDensitySelectorCard(
+    currentDensity: VisualDensityMode,
+    onSelectDensity: (VisualDensityMode) -> Unit
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth().testTag("visual_density_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Layers,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = "Card Corner & Layout Density",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Choose spacious curves or compact pro density",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                VisualDensityMode.values().forEach { mode ->
+                    val isSelected = currentDensity == mode
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSelectDensity(mode) }
+                            .testTag("density_mode_${mode.name.lowercase()}"),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = mode.title,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = mode.subtitle,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardSurfaceShaderSelectorCard(
+    currentShader: CardSurfaceShader,
+    onSelectShader: (CardSurfaceShader) -> Unit
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth().testTag("card_surface_shader_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(IndigoAccent.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = IndigoAccent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = "Tactile Card Shaders & Textures",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Realistic physical card surface finishes",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = "${currentShader.emoji} ${currentShader.title}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(CardSurfaceShader.values(), key = { it.name }) { shader ->
+                    val isSelected = currentShader == shader
+                    Surface(
+                        modifier = Modifier
+                            .width(130.dp)
+                            .clickable { onSelectShader(shader) }
+                            .testTag("shader_item_${shader.name.lowercase()}"),
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Realistic miniature card thumbnail demonstrating the shader
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                Color(0xFF312E81),
+                                                Color(0xFF1E1B4B)
+                                            )
+                                        )
+                                    )
+                            ) {
+                                CardTextureShaderOverlay(
+                                    shader = shader,
+                                    baseColor = Color(0xFF312E81)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .padding(6.dp)
+                                        .size(16.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(Color(0xFFFBBF24))
+                                )
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Column {
+                                Text(
+                                    text = "${shader.emoji} ${shader.title}",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = shader.description,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    lineHeight = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

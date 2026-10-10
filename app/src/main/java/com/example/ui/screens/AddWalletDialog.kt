@@ -110,6 +110,7 @@ fun AddWalletDialog(
     var giftCardPin by remember { mutableStateOf(itemToEdit?.giftCardPin ?: "") }
     var vendorName by remember { mutableStateOf(itemToEdit?.vendorName ?: "") }
     var remindExpiry by remember { mutableStateOf(itemToEdit?.remindExpiry ?: true) }
+    var isMarkedAsUsed by remember { mutableStateOf(itemToEdit?.isMarkedAsUsed ?: false) }
     var showExpiryDatePicker by remember { mutableStateOf(false) }
     var amountText by remember { mutableStateOf(itemToEdit?.let { if (it.amount > 0) it.amount.toInt().toString() else "" } ?: "") }
     var expiryDate by remember { mutableStateOf(itemToEdit?.expiryDate ?: "") }
@@ -313,6 +314,39 @@ fun AddWalletDialog(
                         Switch(
                             checked = remindExpiry,
                             onCheckedChange = { remindExpiry = it }
+                        )
+                    }
+
+                    // Marked as Used Toggle (hides from Dashboard)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isMarkedAsUsed) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .clickable { isMarkedAsUsed = !isMarkedAsUsed }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = if (isMarkedAsUsed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Column {
+                                Text("Marked as Used", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                                Text("Hide used card from Dashboard and mark balance as spent", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Switch(
+                            checked = isMarkedAsUsed,
+                            onCheckedChange = { isMarkedAsUsed = it }
                         )
                     }
 
@@ -625,6 +659,13 @@ fun AddWalletDialog(
                     }
 
                     val amt = amountText.toDoubleOrNull() ?: 0.0
+                    val initialAmt = if (isEditing && itemToEdit != null && itemToEdit.initialAmount > 0) itemToEdit.initialAmount else amt
+                    val currBal = if (isEditing && itemToEdit != null) {
+                        if (isMarkedAsUsed && itemToEdit.currentBalance > 0) 0.0
+                        else itemToEdit.currentBalance
+                    } else {
+                        if (isMarkedAsUsed) 0.0 else amt
+                    }
 
                     val item = WalletOrGiftCard(
                         id = itemToEdit?.id ?: "wgc_${UUID.randomUUID().toString().take(8)}",
@@ -635,6 +676,8 @@ fun AddWalletDialog(
                         vendorName = vendorName.trim(),
                         remindExpiry = remindExpiry,
                         amount = amt,
+                        initialAmount = initialAmt,
+                        currentBalance = currBal,
                         expiryDate = expiryDate.trim(),
                         modeOfRedemption = modeOfRedemption.trim(),
                         remarks = remarks.trim(),
@@ -643,7 +686,8 @@ fun AddWalletDialog(
                         memberId = selectedMemberId,
                         colorHex = selectedColor,
                         barcodeOrReceiptImagePath = barcodeOrReceiptImagePath,
-                        attachmentPaths = attachmentPaths
+                        attachmentPaths = attachmentPaths,
+                        isMarkedAsUsed = isMarkedAsUsed
                     )
                     onSaveItem(item)
                 }

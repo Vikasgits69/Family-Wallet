@@ -8,6 +8,7 @@ import com.example.data.BankAccount
 import com.example.data.CardNetwork
 import com.example.data.CardStatus
 import com.example.data.CreditCard
+import com.example.data.CreditCardStatementLog
 import com.example.data.DebitCard
 import com.example.data.DisplayMode
 import com.example.data.Document
@@ -29,6 +30,9 @@ import com.example.sync.DriveBackupRepository
 import com.example.sync.DriveSyncState
 import com.example.sync.GoogleDriveBackupManager
 import com.example.sync.DriveBackupFileInfo
+import com.example.server.LocalVaultWebServer
+import com.example.server.NetworkUtils
+import com.example.util.NotificationHelper
 import com.example.util.VaultPreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,7 +57,9 @@ data class UpcomingCardAlert(
     val memberId: String,
     val memberName: String,
     val colorHex: Long,
-    val isDueDate: Boolean
+    val isDueDate: Boolean,
+    val outstandingBalance: Double = 0.0,
+    val rewardPoints: Long = 0L
 )
 
 data class FamilyWalletUiState(
@@ -94,6 +100,7 @@ data class FamilyWalletUiState(
     val helplineTargetBank: String = "",
     val activeUpiQrData: Pair<String, String>? = null,
     val spendingGiftCard: WalletOrGiftCard? = null,
+    val loggingStatementCard: CreditCard? = null,
     val notificationMessage: String? = null,
     val isAppLocked: Boolean = true,
     val biometricStatusMessage: String? = null,
@@ -107,6 +114,17 @@ data class FamilyWalletUiState(
     val customAccentColorHex: String? = null,
     val clipboardAutoClearEnabled: Boolean = true,
     val clipboardClearTimeoutSeconds: Int = 30,
+    val visualDensityMode: com.example.data.VisualDensityMode = com.example.data.VisualDensityMode.SPACIOUS,
+    val cardSurfaceShader: com.example.data.CardSurfaceShader = com.example.data.CardSurfaceShader.CLASSIC_GRADIENT,
+    val isWifiServerRunning: Boolean = false,
+    val wifiServerUrl: String? = null,
+    val wifiServerPort: Int = 8080,
+    val wifiServerPin: String = "8492",
+    val wifiServerRequirePin: Boolean = true,
+    val wifiServerConnectedClients: Int = 0,
+    val wifiServerLogs: List<String> = emptyList(),
+    val showWifiServerDialog: Boolean = false,
+    val wifiSsid: String = "",
     val sectionDisplayModes: Map<NavigationTab, DisplayMode> = mapOf(
         NavigationTab.DASHBOARD to DisplayMode.LIST,
         NavigationTab.CARDS to DisplayMode.LIST,
@@ -225,7 +243,10 @@ data class FamilyWalletUiState(
         get() = filteredWalletsAndGiftCards.count { !it.isGiftCard }
 
     val totalGiftCardsCount: Int
-        get() = filteredWalletsAndGiftCards.count { it.isGiftCard }
+        get() = filteredWalletsAndGiftCards.count { it.isGiftCard && !it.isMarkedAsUsed }
+
+    val activeWalletsAndGiftCards: List<WalletOrGiftCard>
+        get() = filteredWalletsAndGiftCards.filter { !it.isGiftCard || !it.isMarkedAsUsed }
 
     val totalDocumentsCount: Int
         get() = filteredDocuments.size
@@ -234,7 +255,7 @@ data class FamilyWalletUiState(
         get() = totalDocumentsCount
 
     val totalVaultAssetsCount: Int
-        get() = filteredCreditCards.size + filteredDebitCards.size + filteredBankAccounts.size + filteredWalletsAndGiftCards.size + filteredDocuments.size
+        get() = filteredCreditCards.size + filteredDebitCards.size + filteredBankAccounts.size + activeWalletsAndGiftCards.size + filteredDocuments.size
 
     // Dynamic Masking Logic:
     // Masked if globally masked AND NOT individually toggled to unmasked
@@ -266,7 +287,9 @@ data class FamilyWalletUiState(
                             memberId = card.memberId,
                             memberName = memberName,
                             colorHex = card.colorHex,
-                            isDueDate = false
+                            isDueDate = false,
+                            outstandingBalance = card.currentOutstandingBalance,
+                            rewardPoints = card.currentEffectiveRewardPoints
                         )
                     )
                 }
@@ -281,7 +304,9 @@ data class FamilyWalletUiState(
                             memberId = card.memberId,
                             memberName = memberName,
                             colorHex = card.colorHex,
-                            isDueDate = true
+                            isDueDate = true,
+                            outstandingBalance = card.currentOutstandingBalance,
+                            rewardPoints = card.currentEffectiveRewardPoints
                         )
                     )
                 }
@@ -294,6 +319,7 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
 
     private val repository: VaultRepository
     private val preferencesManager = VaultPreferencesManager(application)
+    private var webServer: LocalVaultWebServer? = null
 
     private val _uiState = MutableStateFlow(FamilyWalletUiState())
     val uiState: StateFlow<FamilyWalletUiState> = _uiState.asStateFlow()
@@ -304,6 +330,10 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
 
         // Load saved preferences (Master PIN, Dark Theme, Theme Mode, Biometric, Custom Accent, Section View Modes)
         val savedThemeMode = preferencesManager.getThemeMode()
+
+        // Initialize Android system notification channels and reminder scheduler
+        NotificationHelper.createNotificationChannels(application)
+        NotificationHelper.scheduleDailyReminderAlarm(application)
         val savedTheme = preferencesManager.isDarkTheme()
         val savedCustomAccent = preferencesManager.getCustomAccentColor()
         val savedPin = preferencesManager.getMasterPin()
@@ -315,6 +345,12 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
         val savedIncludePhotos = preferencesManager.isIncludePhotosInBackup()
         val savedClipboardAutoClear = preferencesManager.isClipboardAutoClearEnabled()
         val savedClipboardTimeout = preferencesManager.getClipboardClearTimeout()
+        val savedDensity = preferencesManager.getVisualDensityMode()
+        val savedShader = preferencesManager.getCardSurfaceShader()
+        val savedWifiPort = preferencesManager.getWifiServerPort()
+        val savedWifiRequirePin = preferencesManager.isWifiServerRequirePin()
+        val savedWifiPin = preferencesManager.getWifiServerPin()
+        val currentSsid = NetworkUtils.getWifiName(application)
 
         _uiState.update {
             it.copy(
@@ -329,7 +365,13 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
                 autoBackupOnClose = savedAutoClose,
                 includePhotosInBackup = savedIncludePhotos,
                 clipboardAutoClearEnabled = savedClipboardAutoClear,
-                clipboardClearTimeoutSeconds = savedClipboardTimeout
+                clipboardClearTimeoutSeconds = savedClipboardTimeout,
+                visualDensityMode = savedDensity,
+                cardSurfaceShader = savedShader,
+                wifiServerPort = savedWifiPort,
+                wifiServerRequirePin = savedWifiRequirePin,
+                wifiServerPin = savedWifiPin,
+                wifiSsid = currentSsid
             )
         }
 
@@ -369,6 +411,17 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
                         documents = docs.map { it.toDomain() },
                         subscriptions = subs.map { it.toDomain() }
                     )
+                }
+                webServer?.notifyDataChanged()
+                try {
+                    NotificationHelper.checkAndTriggerDueReminders(
+                        context = getApplication(),
+                        creditCards = creditCards.map { it.toDomain() },
+                        wallets = walletsAndGifts.map { it.toDomain() },
+                        documents = docs.map { it.toDomain() }
+                    )
+                } catch (e: Exception) {
+                    // Ignore non-fatal reminder background check errors
                 }
             }.collect {}
         }
@@ -496,6 +549,16 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
     fun setClipboardClearTimeout(seconds: Int) {
         _uiState.update { it.copy(clipboardClearTimeoutSeconds = seconds) }
         preferencesManager.saveClipboardClearTimeout(seconds)
+    }
+
+    fun setVisualDensityMode(mode: com.example.data.VisualDensityMode) {
+        _uiState.update { it.copy(visualDensityMode = mode) }
+        preferencesManager.saveVisualDensityMode(mode)
+    }
+
+    fun setCardSurfaceShader(shader: com.example.data.CardSurfaceShader) {
+        _uiState.update { it.copy(cardSurfaceShader = shader) }
+        preferencesManager.saveCardSurfaceShader(shader)
     }
 
     fun setBiometricStatusMessage(msg: String?) {
@@ -958,18 +1021,135 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
     }
 
     // Gift Card Balance Spend/Deduct
-    fun deductGiftCardBalance(cardId: String, spentAmount: Double) {
+    fun deductGiftCardBalance(cardId: String, spentAmount: Double, remarks: String = "") {
         viewModelScope.launch {
             val card = _uiState.value.walletsAndGiftCards.find { it.id == cardId } ?: return@launch
+            val initialAmt = if (card.initialAmount > 0.0) card.initialAmount else (if (card.amount > 0.0) card.amount else card.currentBalance)
             val newBalance = (card.currentBalance - spentAmount).coerceAtLeast(0.0)
-            val updated = card.copy(currentBalance = newBalance)
+            val updatedRemarks = if (remarks.isNotBlank()) {
+                val entry = "Spent ₹${spentAmount.toInt()}: $remarks"
+                if (card.remarks.isNotBlank()) "${card.remarks}\n$entry" else entry
+            } else card.remarks
+            val updated = card.copy(
+                amount = newBalance,
+                currentBalance = newBalance,
+                initialAmount = initialAmt,
+                remarks = updatedRemarks,
+                isMarkedAsUsed = if (newBalance <= 0.0) true else card.isMarkedAsUsed
+            )
             repository.updateWalletOrGiftCard(updated.toEntity())
             _uiState.update {
                 it.copy(
                     spendingGiftCard = null,
-                    notificationMessage = "Deducted ₹${spentAmount.toInt()} from ${card.providerOrName}. Remaining: ₹${newBalance.toInt()}"
+                    notificationMessage = "Deducted ₹${spentAmount.toInt()} from ${card.providerOrName}. Remaining Balance: ₹${newBalance.toInt()}"
                 )
             }
+        }
+    }
+
+    // Toggle Gift Card Marked as Used
+    fun toggleGiftCardMarkedAsUsed(cardId: String) {
+        viewModelScope.launch {
+            val card = _uiState.value.walletsAndGiftCards.find { it.id == cardId } ?: return@launch
+            val newMarked = !card.isMarkedAsUsed
+            val initialAmt = if (card.initialAmount > 0.0) card.initialAmount else (if (card.amount > 0.0) card.amount else card.currentBalance)
+            val updated = card.copy(
+                isMarkedAsUsed = newMarked,
+                currentBalance = if (newMarked) 0.0 else (if (card.currentBalance > 0.0) card.currentBalance else initialAmt),
+                amount = if (newMarked) 0.0 else (if (card.currentBalance > 0.0) card.currentBalance else initialAmt),
+                initialAmount = initialAmt
+            )
+            repository.updateWalletOrGiftCard(updated.toEntity())
+            _uiState.update {
+                it.copy(
+                    notificationMessage = if (updated.isMarkedAsUsed)
+                        "Marked ${card.providerOrName} as Used (hidden from dashboard)"
+                    else
+                        "Marked ${card.providerOrName} as Active"
+                )
+            }
+        }
+    }
+
+    // Statement Cycle Management for Credit Card
+    fun openLogStatement(card: CreditCard) {
+        _uiState.update { it.copy(loggingStatementCard = card) }
+    }
+
+    fun closeLogStatement() {
+        _uiState.update { it.copy(loggingStatementCard = null) }
+    }
+
+    fun saveCreditCardStatementLog(cardId: String, log: CreditCardStatementLog) {
+        viewModelScope.launch {
+            val card = _uiState.value.creditCards.find { it.id == cardId } ?: return@launch
+            val existingLogs = card.parsedStatementLogs.filter { it.id != log.id }
+            val updatedLogs = (listOf(log) + existingLogs).sortedByDescending { it.timestamp }
+
+            val jsonArray = org.json.JSONArray()
+            updatedLogs.forEach { item ->
+                val obj = org.json.JSONObject().apply {
+                    put("id", item.id)
+                    put("statementMonth", item.statementMonth)
+                    put("openingBalance", item.openingBalance)
+                    put("totalExpenses", item.totalExpenses)
+                    put("totalPayments", item.totalPayments)
+                    put("closingBalance", item.closingBalance)
+                    put("openingRewardPoints", item.openingRewardPoints)
+                    put("rewardPointsEarned", item.rewardPointsEarned)
+                    put("rewardPointsRedeemedOrLapsed", item.rewardPointsRedeemedOrLapsed)
+                    put("closingRewardPoints", item.closingRewardPoints)
+                    put("notes", item.notes)
+                    put("timestamp", item.timestamp)
+                }
+                jsonArray.put(obj)
+            }
+
+            val updatedCard = card.copy(
+                currentStatementMonth = log.statementMonth,
+                statementOpeningBalance = log.openingBalance,
+                statementTotalExpenses = log.totalExpenses,
+                statementTotalPayments = log.totalPayments,
+                statementClosingBalance = log.closingBalance,
+                statementOpeningRewardPoints = log.openingRewardPoints,
+                statementRewardPointsEarned = log.rewardPointsEarned,
+                statementRewardPointsRedeemed = log.rewardPointsRedeemedOrLapsed,
+                statementClosingRewardPoints = log.closingRewardPoints,
+                ccRewardPoints = log.closingRewardPoints,
+                statementLogsJson = jsonArray.toString()
+            )
+
+            repository.updateCreditCard(updatedCard.toEntity())
+            _uiState.update {
+                it.copy(
+                    loggingStatementCard = null,
+                    notificationMessage = "Logged ${log.statementMonth} statement: Balance ₹${log.closingBalance.toInt()}, Reward Points: ${log.closingRewardPoints} pts"
+                )
+            }
+        }
+    }
+
+    // Notifications & Reminders Actions
+    fun triggerTestNotification() {
+        NotificationHelper.sendTestNotification(getApplication())
+        _uiState.update { it.copy(notificationMessage = "Test notification sent! Check your notification shade 🔔") }
+    }
+
+    fun scanAndTriggerDueReminders() {
+        val current = _uiState.value
+        val count = NotificationHelper.checkAndTriggerDueReminders(
+            context = getApplication(),
+            creditCards = current.creditCards,
+            wallets = current.walletsAndGiftCards,
+            documents = current.documents
+        )
+        _uiState.update {
+            it.copy(
+                notificationMessage = if (count > 0)
+                    "Dispatched $count due date & expiry reminder notification(s) 🔔"
+                else
+                    "Scanned all cards & docs: No upcoming due dates or expiries today ✓"
+            )
         }
     }
 
@@ -1051,5 +1231,156 @@ class FamilyWalletViewModel(application: Application) : AndroidViewModel(applica
                 onComplete(false)
             }
         }
+    }
+
+    // ==================== WI-FI WEB SERVER MANAGEMENT ====================
+
+    fun setWifiServerDialogVisible(visible: Boolean) {
+        if (visible) {
+            refreshWifiInfo()
+        }
+        _uiState.update { it.copy(showWifiServerDialog = visible) }
+    }
+
+    fun refreshWifiInfo() {
+        val app = getApplication<Application>()
+        val ip = NetworkUtils.getLocalIpAddress(app)
+        val ssid = NetworkUtils.getWifiName(app)
+        val port = _uiState.value.wifiServerPort
+        val url = if (ip != null) "http://$ip:$port" else null
+
+        _uiState.update {
+            it.copy(
+                wifiSsid = ssid,
+                wifiServerUrl = if (it.isWifiServerRunning) url else it.wifiServerUrl
+            )
+        }
+    }
+
+    fun startWifiServer() {
+        if (_uiState.value.isWifiServerRunning) return
+        val app = getApplication<Application>()
+        val ip = NetworkUtils.getLocalIpAddress(app)
+        val port = _uiState.value.wifiServerPort
+        val ssid = NetworkUtils.getWifiName(app)
+
+        if (ip == null) {
+            _uiState.update {
+                it.copy(
+                    notificationMessage = "Please connect to Wi-Fi or turn on Hotspot to start server",
+                    wifiSsid = ssid
+                )
+            }
+            return
+        }
+
+        webServer?.stop()
+        val server = LocalVaultWebServer(
+            context = app,
+            port = port,
+            requirePin = _uiState.value.wifiServerRequirePin,
+            sessionPin = _uiState.value.wifiServerPin,
+            dataProvider = { _uiState.value },
+            onSaveCreditCard = { card -> saveCreditCard(card) },
+            onDeleteCreditCard = { id -> deleteCreditCard(id) },
+            onSaveDebitCard = { card -> saveDebitCard(card) },
+            onDeleteDebitCard = { id -> deleteDebitCard(id) },
+            onSaveBankAccount = { bank -> saveBankAccount(bank) },
+            onDeleteBankAccount = { id -> deleteBankAccount(id) },
+            onSaveWalletOrGiftCard = { wallet -> saveWalletOrGiftCard(wallet) },
+            onDeleteWalletOrGiftCard = { id -> deleteWalletOrGiftCard(id) },
+            onSaveMember = { member -> saveFamilyMember(member) },
+            onDeleteMember = { id -> deleteFamilyMember(id) },
+            onSaveDocument = { doc -> saveDocument(doc) },
+            onDeleteDocument = { id -> deleteDocument(id) },
+            onSetThemeMode = { mode -> setThemeMode(mode) },
+            onSetCustomAccent = { hex -> setCustomAccentColor(hex) },
+            onLogActivity = { log ->
+                _uiState.update { current ->
+                    val updated = (listOf(log) + current.wifiServerLogs).take(30)
+                    current.copy(
+                        wifiServerLogs = updated,
+                        wifiServerConnectedClients = webServer?.getConnectedClientCount() ?: current.wifiServerConnectedClients
+                    )
+                }
+            }
+        )
+
+        val success = server.start()
+        if (success) {
+            webServer = server
+            val url = "http://$ip:$port"
+            _uiState.update {
+                it.copy(
+                    isWifiServerRunning = true,
+                    wifiServerUrl = url,
+                    wifiSsid = ssid,
+                    notificationMessage = "Wi-Fi Server running: $url"
+                )
+            }
+        } else {
+            _uiState.update {
+                it.copy(
+                    isWifiServerRunning = false,
+                    notificationMessage = "Failed to bind to port $port. Try another port."
+                )
+            }
+        }
+    }
+
+    fun stopWifiServer() {
+        webServer?.stop()
+        webServer = null
+        _uiState.update {
+            it.copy(
+                isWifiServerRunning = false,
+                wifiServerUrl = null,
+                wifiServerConnectedClients = 0,
+                notificationMessage = "Wi-Fi Server stopped"
+            )
+        }
+    }
+
+    fun toggleWifiServer() {
+        if (_uiState.value.isWifiServerRunning) {
+            stopWifiServer()
+        } else {
+            startWifiServer()
+        }
+    }
+
+    fun setWifiServerPort(port: Int) {
+        preferencesManager.saveWifiServerPort(port)
+        val wasRunning = _uiState.value.isWifiServerRunning
+        if (wasRunning) {
+            stopWifiServer()
+        }
+        _uiState.update { it.copy(wifiServerPort = port) }
+        if (wasRunning) {
+            startWifiServer()
+        }
+    }
+
+    fun setWifiServerRequirePin(require: Boolean) {
+        preferencesManager.saveWifiServerRequirePin(require)
+        webServer?.requirePin = require
+        _uiState.update { it.copy(wifiServerRequirePin = require) }
+    }
+
+    fun generateNewWifiServerPin() {
+        val newPin = (1000..9999).random().toString()
+        preferencesManager.saveWifiServerPin(newPin)
+        webServer?.sessionPin = newPin
+        _uiState.update { it.copy(wifiServerPin = newPin) }
+    }
+
+    fun clearWifiLogs() {
+        _uiState.update { it.copy(wifiServerLogs = emptyList()) }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        webServer?.stop()
+        webServer = null
     }
 }

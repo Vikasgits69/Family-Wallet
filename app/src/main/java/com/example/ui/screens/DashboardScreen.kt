@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CardGiftcard
@@ -94,6 +96,7 @@ fun DashboardScreen(
     onOpenEmergencyIce: () -> Unit = {},
     onOpenSecurityCheckup: () -> Unit = {},
     onOpenHelplines: () -> Unit = {},
+    onOpenWifiServer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Immediate rendering with zero delay for snappy border and card loading
@@ -192,6 +195,99 @@ fun DashboardScreen(
                         Icon(Icons.Default.Subscriptions, contentDescription = null, tint = AmberGold, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("${uiState.subscriptions.size} Subs", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = AmberGold)
+                    }
+                }
+            }
+        }
+
+        // Wi-Fi Web Companion Card
+        item {
+            Surface(
+                onClick = onOpenWifiServer,
+                shape = RoundedCornerShape(16.dp),
+                color = if (uiState.isWifiServerRunning) EmeraldMint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (uiState.isWifiServerRunning) EmeraldMint.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("wifi_companion_dashboard_banner")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (uiState.isWifiServerRunning) EmeraldMint.copy(alpha = 0.2f) else IndigoAccent.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isWifiServerRunning) Icons.Default.Wifi else Icons.Default.Language,
+                                contentDescription = null,
+                                tint = if (uiState.isWifiServerRunning) EmeraldMint else IndigoAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (uiState.isWifiServerRunning) "Wi-Fi Server Live" else "Wi-Fi Web Companion",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (uiState.isWifiServerRunning) EmeraldMint else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (uiState.isWifiServerRunning) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(EmeraldMint)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = if (uiState.isWifiServerRunning)
+                                    uiState.wifiServerUrl ?: "Connected"
+                                else
+                                    "Load & edit vault on browser over Wi-Fi",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (uiState.isWifiServerRunning) EmeraldMint else MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (uiState.isWifiServerRunning) EmeraldMint else MaterialTheme.colorScheme.outlineVariant
+                        )
+                    ) {
+                        Text(
+                            text = if (uiState.isWifiServerRunning) "CONNECTED" else "CONNECT",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            ),
+                            color = if (uiState.isWifiServerRunning) Color.White else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
                 }
             }
@@ -327,7 +423,7 @@ private fun VaultOverviewWithChartCard(
                     )
                     OverviewStatRow(
                         label = "Wallets & Gifts",
-                        count = uiState.filteredWalletsAndGiftCards.size,
+                        count = uiState.activeWalletsAndGiftCards.size,
                         color = AmberGold,
                         icon = Icons.Outlined.AccountBalanceWallet,
                         onClick = { onNavigateTab(NavigationTab.WALLETS) }
@@ -345,7 +441,7 @@ private fun VaultOverviewWithChartCard(
                         debitCount = uiState.filteredDebitCards.size,
                         bankCount = uiState.filteredBankAccounts.size,
                         personalDocCount = uiState.filteredPersonalDocuments.size,
-                        walletGiftCount = uiState.filteredWalletsAndGiftCards.size,
+                        walletGiftCount = uiState.activeWalletsAndGiftCards.size,
                         modifier = Modifier.fillMaxSize()
                     )
 
@@ -642,16 +738,26 @@ private fun UpcomingAlertItem(
                     }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (alert.isDueDate) RoseCrimson.copy(alpha = 0.15f) else AmberGold.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = if (alert.isDueDate) "Due: ${alert.dueDate}" else "Bill: ${alert.statementDate}",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (alert.isDueDate) RoseCrimson else AmberGold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                Column(horizontalAlignment = Alignment.End) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (alert.isDueDate) RoseCrimson.copy(alpha = 0.15f) else AmberGold.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = if (alert.isDueDate) "Due: ${alert.dueDate}" else "Bill: ${alert.statementDate}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (alert.isDueDate) RoseCrimson else AmberGold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    if (alert.outstandingBalance > 0) {
+                        Text(
+                            text = "Bal: ₹${alert.outstandingBalance.toInt()}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            color = IndigoAccent,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
             }
 
